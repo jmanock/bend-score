@@ -1,170 +1,210 @@
 # Bend Score
 
-Bend Score is an offline, terminal-first acquisition intelligence tool for digital businesses and neglected online assets.
+Bend Score is an offline, terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
 
-It helps evaluate SaaS products, content sites, newsletters, Chrome extensions, mobile apps, domains, affiliate sites, WordPress plugins, and other small digital assets. Bend Score stores listings in SQLite, scores them with modular rule-based scorers, ranks opportunities, manages a watchlist, and generates markdown acquisition reports.
+V3 is built around **Observers** and **Signals**. Observers collect facts from a source. Signals normalize those facts into one standard intelligence format. The database stores every signal snapshot so Bend Score can build a timeline of opportunity intelligence over time.
 
-V2 is still intentionally private and local. There is no scraping, no paid API, no OpenAI or LLM dependency, no authentication, no cloud service, and no web dashboard.
-
-## Install
-
-```bash
-cd /Users/jonmanock/Documents/Codex/bend-score
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-V2 uses only the Python standard library.
+No real scraping, APIs, OpenAI calls, cloud services, authentication, or web dashboard are included in V3.
 
 ## Run
 
 ```bash
-python main.py run
+python3 main.py run
 ```
 
-This creates the database if needed, seeds sample listings when empty, recalculates scores, prints a polished terminal intelligence report, writes logs, and generates:
+You should see:
+
+```text
+Loading observers...
+✓ Fake Opportunity Observer
+Collected:
+15 opportunities
+Generated:
+35 signals
+Highest Confidence:
+88%
+Writing report...
+Done.
+```
+
+Reports are generated at:
 
 - `reports/latest.md`
 - `reports/YYYY-MM-DD.md`
 
+Daily logs are stored in:
+
+- `logs/YYYY-MM-DD.log`
+
 ## Commands
 
 ```bash
-python main.py run
-python main.py top
-python main.py stats
-python main.py search saas
-python main.py search newsletter
-python main.py search affiliate
-python main.py watch 4
-python main.py watchlist
-python main.py note 4 "Check seller history and traffic quality"
+python3 main.py run
+python3 main.py top
+python3 main.py stats
+python3 main.py search saas
+python3 main.py watch 4
+python3 main.py watchlist
+python3 main.py note 4 "Check seller history and traffic quality"
 ```
 
 ## Architecture
 
 ```text
-bend_score/
-  analysis/              Rule-based business observations
-  ai/                    Placeholder for future AI-assisted ideas
-  collectors/            Sample data now, future marketplace collectors later
-  database/              SQLite repository and watchlist persistence
-  reports/               Markdown report generation
-  scoring/               Modular acquisition scoring engines
-  app.py                 Command workflows
-  config.py              Paths, logging folders, seed count, scoring weights
-  models.py              Listing and watchlist models
-  recommendations.py     BUY / WATCH / RESEARCH / PASS assignment
-  ui.py                  Terminal formatting
-data/                    Local SQLite database
-logs/                    Daily run logs
-reports/                 Generated markdown reports
-tests/                   Unit tests
+Observer -> Raw Facts -> Signal -> SQLite Timeline -> Intelligence Report
 ```
 
-## Scoring
+```text
+bend_score/
+  core/                  Observer orchestration and intelligence runs
+  observers/             Observer base class, registry, fake observer, future source stubs
+  models/                Listing, watchlist, and standardized Signal models
+  database/              SQLite repository, listings, watchlist, signals, signal history
+  reports/               Markdown intelligence briefings
+  utils/                 Confidence and config helpers
+  scoring/               Existing Bend Score acquisition scoring
+  analysis/              Rule-based business insights
+  ai/                    Placeholder only; no AI calls in V3
+config/
+  observers.yaml         Enable or disable observers without code edits
+data/
+  bend_score.sqlite3     Local SQLite database
+logs/
+  YYYY-MM-DD.log         Run logs
+reports/
+  latest.md              Current daily briefing
+tests/
+  unit tests
+```
 
-Each listing is evaluated by modular scorers in `bend_score/scoring/`.
+## Observer Lifecycle
 
-Each scorer returns:
+Every observer implements the same interface:
 
 ```python
-{
-    "score": 0-10,
-    "explanation": "...",
-    "confidence": 0-100,
-}
+name
+run()
+collect()
+normalize()
 ```
 
-The current V2 scorers are:
+- `collect()` gathers raw facts from a source.
+- `normalize()` converts those facts into standard `Signal` objects.
+- `run()` measures runtime and returns a normalized observer result.
 
-- acquisition score
-- automation score
-- SEO score
-- revenue score
-- maintenance score
-- AI leverage score
-- competition score
-- exit score
+Observers do not know anything about scoring. They only collect facts and normalize them.
 
-`bend_score/scoring/bend_score.py` combines those components into one 0-100 Bend Score using configurable weights from `bend_score/config.py`.
+New observers register automatically by subclassing `Observer` and setting a unique `name`.
 
-## Recommendations
+## Signal Lifecycle
 
-Every listing receives one recommendation:
+Every observer outputs the same `Signal` model:
+
+```python
+id
+timestamp
+observer
+signal_type
+title
+description
+category
+confidence
+impact
+recommendation
+metadata
+```
+
+Recommendations are standardized to:
 
 - `BUY`
-- `RESEARCH`
+- `BUILD`
 - `WATCH`
-- `PASS`
+- `RESEARCH`
+- `IGNORE`
 
-The recommendation includes a short explanation and is stored with the listing.
+Metadata is arbitrary JSON so future observers can store source-specific context without changing the core schema.
 
-## Watchlists
+## Database Overview
 
-The `watchlist` SQLite table tracks listings you want to monitor.
+SQLite remains the source of truth.
 
-Statuses supported by the database:
+Current tables:
 
-- Watching
-- Researching
-- Interested
-- Contacted
-- Passed
-- Purchased
+- `listings`
+- `watchlist`
+- `signals`
+- `signal_history`
 
-Use:
+Every run inserts new rows into `signals` and `signal_history`. History is never overwritten. This creates the timeline Bend Score will later use for acceleration, trend, and anomaly detection.
 
-```bash
-python main.py watch 4
-python main.py note 4 "Review Chrome Web Store reviews"
-python main.py watchlist
+## Observer Configuration
+
+Enable or disable observers in:
+
+```text
+config/observers.yaml
 ```
-
-## Reports
-
-Reports include:
-
-- top opportunities
-- highest revenue
-- highest ROI potential
-- most automation potential
-- best SEO opportunities
-- businesses added today
-- watchlist summary
-- interesting observations
-
-## Logging
-
-Every `run` writes to a daily log file in `logs/`.
 
 Example:
 
-```text
-logs/2026-07-02.log
+```yaml
+fake_opportunity:
+  enabled: true
+
+github:
+  enabled: false
+
+reddit:
+  enabled: false
 ```
 
-Logs include database setup, seed completion, score calculation, report generation, runtime, and errors when they occur.
+## Current Observer
 
-## Future Collectors
+V3 includes one real reference observer:
 
-Bend Score is designed to add real collectors later for:
+- `Fake Opportunity Observer`
 
-- Flippa
-- Acquire.com
-- Microns
-- Empire Flippers
-- GitHub
-- Product Hunt
-- Reddit
-- newsletters
+It converts the existing sample opportunity generator into normalized signals. This preserves the V1/V2 demo data while proving the V3 observer framework.
 
-Collectors should normalize external records into the existing `Listing` model before scoring.
+## Future Observer Examples
 
-## Future AI
+Future observers can plug into the same architecture:
 
-The `bend_score/ai/` folder is reserved for future optional AI assistance, such as diligence summaries, buyer questions, or opportunity memos. V2 does not call any AI APIs.
+- GitHub repository growth
+- Reddit niche demand
+- Product Hunt launches
+- Google Trends movement
+- Acquire.com listings
+- Flippa listings
+- domains and expired domains
+- newsletter marketplace signals
+
+A small observer should be possible in under 100 lines because it only needs to collect facts and normalize them into `Signal` objects.
+
+## Intelligence Reports
+
+`reports/latest.md` is now a daily intelligence briefing with:
+
+- High Confidence Signals
+- BUY
+- WATCH
+- BUILD
+- RESEARCH
+- IGNORE
+- Signal Summary
+- Statistics
+- Observer Summary
+- Recommendations
+
+## Roadmap
+
+- Detect signal acceleration across `signal_history`
+- Add source-specific observers one at a time
+- Add duplicate and entity resolution
+- Add richer confidence weighting
+- Add local import/export workflows
+- Add optional AI-generated diligence memos later
+- Add a dashboard only after the terminal workflow is mature
 
 ## Test
 

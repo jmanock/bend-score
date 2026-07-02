@@ -65,5 +65,4 @@ def recommendation_for(total: float, components: dict[str, ScorerResult] | None 
         return "RESEARCH", "Promising upside signal deserves deeper diligence before action."
     if total >= 55:
         return "WATCH", "Some useful signals, but the opportunity needs more proof or a better price."
-    return "PASS", "Current signals are too weak for serious acquisition work."
-
+    return "IGNORE", "Current signals are too weak for serious acquisition work."

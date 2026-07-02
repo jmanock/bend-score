@@ -6,10 +6,11 @@ import time
 from bend_score.analysis.insights import portfolio_observations
 from bend_score.collectors.sample_data import sample_listings
 from bend_score.config import SEED_COUNT
+from bend_score.core.intelligence import run_observers
 from bend_score.database.repository import ListingRepository
 from bend_score.logging_utils import configure_logging
 from bend_score.recommendations import apply_recommendation
-from bend_score.reports.markdown import write_reports
+from bend_score.reports.markdown import write_intelligence_reports
 from bend_score import ui
 
 
@@ -25,12 +26,43 @@ def run() -> None:
             repository.add_many(sample_listings()[:SEED_COUNT])
             logger.info("seed completed count=%s", SEED_COUNT)
 
+        print("Loading observers...")
+        intelligence = run_observers()
+        for result in intelligence.observer_results:
+            print(f"{ui.GREEN}✓{ui.RESET} {result.label}")
+
+        inserted_signals = repository.insert_signals(intelligence.signals)
+        logger.info("signals generated count=%s", len(inserted_signals))
+        logger.info("timeline updated count=%s", len(inserted_signals))
+
         listings = refresh_scores(repository, logger)
         ranked = sorted(listings, key=lambda item: item.bend_score or 0, reverse=True)
-        latest_path, dated_path = write_reports(ranked, repository.list_watchlist())
+        print("Writing report...")
+        latest_path, dated_path = write_intelligence_reports(
+            intelligence,
+            repository.list_signals(limit=500),
+            ranked,
+            repository.list_watchlist(),
+        )
+        print("Done.")
         logger.info("reports generated latest=%s dated=%s", latest_path, dated_path)
 
         ui.header()
+        ui.section("Observer Run")
+        print(f"{ui.GREEN}✓{ui.RESET} Observer loaded")
+        print(f"{ui.GREEN}✓{ui.RESET} Signals generated: {len(inserted_signals)}")
+        print(f"{ui.GREEN}✓{ui.RESET} Timeline updated")
+        print(f"{ui.GREEN}✓{ui.RESET} Confidence calculated: {intelligence.average_confidence:.1f}% average")
+        print(f"{ui.GREEN}✓{ui.RESET} Intelligence report generated")
+
+        ui.section("Collected")
+        for result in intelligence.observer_results:
+            print(f"{result.raw_count} opportunities from {result.label}")
+
+        ui.section("Generated")
+        print(f"{len(inserted_signals)} signals")
+        print(f"Highest Confidence: {intelligence.highest_confidence}%")
+
         ui.section("Top Opportunities")
         ui.print_listings(ranked, limit=10)
 

@@ -5,12 +5,126 @@ from pathlib import Path
 
 from bend_score.ai.ideas import improvement_ideas, why_interesting
 from bend_score.analysis.insights import listing_insights, portfolio_observations
+from bend_score.core.intelligence import IntelligenceRun
 from bend_score.config import REPORT_DIR
-from bend_score.models import Listing, WatchlistItem
+from bend_score.models import Listing, Signal, WatchlistItem
 from bend_score.scoring.bend_score import calculate_bend_score
 
 
 REPORT_PATH = REPORT_DIR / "latest.md"
+
+
+def write_intelligence_reports(
+    intelligence: IntelligenceRun,
+    all_signals: list[Signal],
+    listings: list[Listing],
+    watchlist: list[WatchlistItem],
+    report_dir: Path = REPORT_DIR,
+) -> tuple[Path, Path]:
+    report_dir.mkdir(parents=True, exist_ok=True)
+    latest_path = report_dir / "latest.md"
+    dated_path = report_dir / f"{datetime.now().strftime('%Y-%m-%d')}.md"
+    content = build_intelligence_report(intelligence, all_signals, listings, watchlist)
+    latest_path.write_text(content, encoding="utf-8")
+    dated_path.write_text(content, encoding="utf-8")
+    return latest_path, dated_path
+
+
+def build_intelligence_report(
+    intelligence: IntelligenceRun,
+    all_signals: list[Signal],
+    listings: list[Listing],
+    watchlist: list[WatchlistItem],
+) -> str:
+    current_signals = intelligence.signals
+    high_confidence = sorted(
+        [signal for signal in current_signals if signal.confidence >= 80],
+        key=lambda signal: signal.confidence,
+        reverse=True,
+    )
+    lines = [
+        "# Today's Intelligence",
+        "",
+        f"Date generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+        f"Signals generated today: {len(current_signals)}",
+        f"Signals in timeline: {len(all_signals)}",
+        "",
+        "## High Confidence Signals",
+        "",
+    ]
+    lines.extend(_signal_lines(high_confidence[:12]))
+
+    for recommendation in ["BUY", "WATCH", "BUILD", "RESEARCH", "IGNORE"]:
+        matching = [signal for signal in current_signals if signal.recommendation == recommendation]
+        lines.extend([f"## {recommendation}", ""])
+        lines.extend(_signal_lines(matching[:10]))
+
+    lines.extend(["## Signal Summary", ""])
+    lines.append(f"- Generated this run: {len(current_signals)}")
+    lines.append(f"- Average confidence: {intelligence.average_confidence:.1f}%")
+    lines.append(f"- Highest confidence: {intelligence.highest_confidence}%")
+    lines.append(f"- Timeline snapshots stored: {len(all_signals)}")
+    lines.append("")
+
+    lines.extend(["## Statistics", ""])
+    lines.append(f"- Listings in database: {len(listings)}")
+    lines.append(f"- Watchlist items: {len(watchlist)}")
+    if listings:
+        average_score = sum(listing.bend_score or 0 for listing in listings) / len(listings)
+        lines.append(f"- Average Bend Score: {average_score:.1f}")
+    lines.append("")
+
+    lines.extend(["## Observer Summary", ""])
+    if not intelligence.observer_results:
+        lines.append("- No observers enabled.")
+    for result in intelligence.observer_results:
+        average = (
+            sum(signal.confidence for signal in result.signals) / len(result.signals)
+            if result.signals
+            else 0
+        )
+        highest = max([signal.confidence for signal in result.signals], default=0)
+        lines.append(f"- {result.label}:")
+        lines.append(f"  - Signals generated: {len(result.signals)}")
+        lines.append(f"  - Raw facts collected: {result.raw_count}")
+        lines.append(f"  - Average confidence: {average:.1f}%")
+        lines.append(f"  - Highest confidence: {highest}%")
+        lines.append(f"  - Runtime: {result.runtime_seconds:.3f}s")
+    lines.append("")
+
+    lines.extend(["## Recommendations", ""])
+    recommendations = _recommendation_summary(current_signals)
+    lines.extend([f"- {line}" for line in recommendations])
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+def _signal_lines(signals: list[Signal]) -> list[str]:
+    if not signals:
+        return ["No signals.", ""]
+    lines: list[str] = []
+    for signal in signals:
+        lines.append(
+            f"- **{signal.title}** ({signal.signal_type}, {signal.category}) - "
+            f"{signal.confidence}% confidence, {signal.impact} impact"
+        )
+        lines.append(f"  - Recommendation: {signal.recommendation}")
+        lines.append(f"  - {signal.description}")
+    lines.append("")
+    return lines
+
+
+def _recommendation_summary(signals: list[Signal]) -> list[str]:
+    if not signals:
+        return ["Enable at least one observer to generate recommendations."]
+    counts: dict[str, int] = {}
+    for signal in signals:
+        counts[signal.recommendation] = counts.get(signal.recommendation, 0) + 1
+    return [
+        f"{recommendation}: {counts.get(recommendation, 0)} signals"
+        for recommendation in ["BUY", "BUILD", "WATCH", "RESEARCH", "IGNORE"]
+    ]
 
 
 def write_reports(

@@ -9,7 +9,7 @@ class RecommendationTest(unittest.TestCase):
         listing = apply_recommendation(sample_listings()[0])
 
         self.assertIsNotNone(listing.bend_score)
-        self.assertIn(listing.recommendation, {"BUY", "WATCH", "RESEARCH", "PASS"})
+        self.assertIn(listing.recommendation, {"BUY", "WATCH", "RESEARCH", "IGNORE"})
         self.assertTrue(listing.recommendation_explanation)
 
 

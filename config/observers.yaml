@@ -1,0 +1,9 @@
+fake_opportunity:
+  enabled: true
+
+github:
+  enabled: false
+
+reddit:
+  enabled: false
+

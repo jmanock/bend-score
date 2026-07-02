@@ -7,6 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATABASE_PATH = BASE_DIR / "data" / "bend_score.sqlite3"
 REPORT_DIR = BASE_DIR / "reports"
 LOG_DIR = BASE_DIR / "logs"
+OBSERVER_CONFIG_PATH = BASE_DIR / "config" / "observers.yaml"
 SEED_COUNT = 15
 
 DEFAULT_SCORING_WEIGHTS = {
@@ -19,4 +20,3 @@ DEFAULT_SCORING_WEIGHTS = {
     "competition": 0.8,
     "exit": 1.0,
 }
-

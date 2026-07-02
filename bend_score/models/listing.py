@@ -66,3 +66,4 @@ class WatchlistItem:
 
 def _row_value(row: Any, key: str) -> Any:
     return row[key] if key in row.keys() else None
+

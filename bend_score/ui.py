@@ -108,4 +108,3 @@ def _status_color(status: str) -> str:
     if status == "Passed":
         return RED
     return YELLOW
-

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Iterable
 
 from bend_score.config import DATABASE_PATH
-from bend_score.models import Listing, WatchlistItem, utc_now
+from bend_score.models import Listing, Signal, WatchlistItem, utc_now
 from bend_score.scoring.common import revenue_multiple
 
 
@@ -62,6 +62,40 @@ class ListingRepository:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS signals (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp TEXT NOT NULL,
+                    observer TEXT NOT NULL,
+                    signal_type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT NOT NULL,
+                    category TEXT NOT NULL,
+                    confidence INTEGER NOT NULL,
+                    impact TEXT NOT NULL,
+                    recommendation TEXT NOT NULL,
+                    metadata TEXT NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS signal_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    signal_id INTEGER NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    observer TEXT NOT NULL,
+                    signal_type TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    confidence INTEGER NOT NULL,
+                    impact TEXT NOT NULL,
+                    recommendation TEXT NOT NULL,
+                    metadata TEXT NOT NULL,
+                    FOREIGN KEY (signal_id) REFERENCES signals(id)
+                )
+                """
+            )
 
     def _add_column_if_missing(
         self, connection: sqlite3.Connection, table: str, column: str, definition: str
@@ -78,6 +112,87 @@ class ListingRepository:
         with self.connect() as connection:
             row = connection.execute("SELECT COUNT(*) AS count FROM listings").fetchone()
             return int(row["count"])
+
+    def insert_signals(self, signals: Iterable[Signal]) -> list[Signal]:
+        inserted: list[Signal] = []
+        with self.connect() as connection:
+            for signal in signals:
+                cursor = connection.execute(
+                    """
+                    INSERT INTO signals (
+                        timestamp, observer, signal_type, title, description,
+                        category, confidence, impact, recommendation, metadata
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        signal.timestamp,
+                        signal.observer,
+                        signal.signal_type,
+                        signal.title,
+                        signal.description,
+                        signal.category,
+                        signal.confidence,
+                        signal.impact,
+                        signal.recommendation,
+                        signal.metadata_json(),
+                    ),
+                )
+                signal.id = cursor.lastrowid
+                connection.execute(
+                    """
+                    INSERT INTO signal_history (
+                        signal_id, timestamp, observer, signal_type, title,
+                        confidence, impact, recommendation, metadata
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        signal.id,
+                        signal.timestamp,
+                        signal.observer,
+                        signal.signal_type,
+                        signal.title,
+                        signal.confidence,
+                        signal.impact,
+                        signal.recommendation,
+                        signal.metadata_json(),
+                    ),
+                )
+                inserted.append(signal)
+        return inserted
+
+    def list_signals(self, limit: int = 100) -> list[Signal]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM signals ORDER BY timestamp DESC, id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            return [Signal.from_row(row) for row in rows]
+
+    def signal_stats(self) -> dict[str, object]:
+        with self.connect() as connection:
+            total = connection.execute("SELECT COUNT(*) AS count FROM signals").fetchone()["count"]
+            history_total = connection.execute("SELECT COUNT(*) AS count FROM signal_history").fetchone()["count"]
+            avg_confidence = connection.execute(
+                "SELECT AVG(confidence) AS average FROM signals"
+            ).fetchone()["average"]
+            highest_confidence = connection.execute(
+                "SELECT MAX(confidence) AS highest FROM signals"
+            ).fetchone()["highest"]
+            by_observer = {
+                row["observer"]: row["count"]
+                for row in connection.execute(
+                    "SELECT observer, COUNT(*) AS count FROM signals GROUP BY observer ORDER BY observer"
+                ).fetchall()
+            }
+            return {
+                "signals": total,
+                "history": history_total,
+                "average_confidence": float(avg_confidence or 0),
+                "highest_confidence": int(highest_confidence or 0),
+                "by_observer": by_observer,
+            }
 
     def add_many(self, listings: Iterable[Listing]) -> None:
         with self.connect() as connection:
