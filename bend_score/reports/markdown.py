@@ -59,6 +59,10 @@ def build_intelligence_report(
         lines.extend([f"## {recommendation}", ""])
         lines.extend(_signal_lines(matching[:10]))
 
+    github_signals = [signal for signal in current_signals if signal.observer == "github"]
+    if github_signals:
+        lines.extend(_github_section(github_signals))
+
     lines.extend(["## Signal Summary", ""])
     lines.append(f"- Generated this run: {len(current_signals)}")
     lines.append(f"- Average confidence: {intelligence.average_confidence:.1f}%")
@@ -125,6 +129,36 @@ def _recommendation_summary(signals: list[Signal]) -> list[str]:
         f"{recommendation}: {counts.get(recommendation, 0)} signals"
         for recommendation in ["BUY", "BUILD", "WATCH", "RESEARCH", "IGNORE"]
     ]
+
+
+def _github_section(signals: list[Signal]) -> list[str]:
+    groups = [
+        ("Fast Growth Candidates", {"github_fast_growth_candidate"}),
+        ("Abandoned Popular Repos", {"github_abandoned_popular_repo"}),
+        ("Commercial Potential", {"github_commercial_potential"}),
+        ("AI / Automation Tools", {"github_ai_tool", "github_automation_tool", "github_developer_tool"}),
+        ("No Homepage Opportunities", {"github_no_homepage_opportunity"}),
+        ("High Issue Demand", {"github_high_issue_demand"}),
+    ]
+    lines = ["## GitHub Intelligence", ""]
+    for title, signal_types in groups:
+        matching = [signal for signal in signals if signal.signal_type in signal_types]
+        lines.extend([f"### {title}", ""])
+        if not matching:
+            lines.extend(["No signals.", ""])
+            continue
+        for signal in sorted(matching, key=lambda item: item.confidence, reverse=True)[:8]:
+            metadata = signal.metadata
+            lines.append(f"- **{signal.title}**")
+            lines.append(f"  - URL: {metadata.get('github_html_url') or metadata.get('html_url') or 'n/a'}")
+            lines.append(f"  - Stars: {metadata.get('stars', 0):,}")
+            lines.append(f"  - Language: {metadata.get('language') or 'Unknown'}")
+            lines.append(f"  - Signal type: {signal.signal_type}")
+            lines.append(f"  - Confidence: {signal.confidence}%")
+            lines.append(f"  - Recommendation: {signal.recommendation}")
+            lines.append(f"  - Why it matters: {signal.description}")
+        lines.append("")
+    return lines
 
 
 def write_reports(

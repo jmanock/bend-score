@@ -1,10 +1,10 @@
 # Bend Score
 
-Bend Score is an offline, terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
+Bend Score is a terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
 
-V3 is built around **Observers** and **Signals**. Observers collect facts from a source. Signals normalize those facts into one standard intelligence format. The database stores every signal snapshot so Bend Score can build a timeline of opportunity intelligence over time.
+V4 is built around **Observers** and **Signals**. Observers collect facts from a source. Signals normalize those facts into one standard intelligence format. The database stores every signal snapshot so Bend Score can build a timeline of opportunity intelligence over time.
 
-No real scraping, APIs, OpenAI calls, cloud services, authentication, or web dashboard are included in V3.
+Bend Score uses GitHub's public REST API for the GitHub Observer. It does not use paid APIs, OpenAI calls, marketplace scraping, cloud services, authentication, or a web dashboard.
 
 ## Run
 
@@ -17,12 +17,14 @@ You should see:
 ```text
 Loading observers...
 ✓ Fake Opportunity Observer
+✓ GitHub Observer
 Collected:
 15 opportunities
+90 repositories
 Generated:
-35 signals
+hundreds of signals
 Highest Confidence:
-88%
+95%
 Writing report...
 Done.
 ```
@@ -46,6 +48,9 @@ python3 main.py search saas
 python3 main.py watch 4
 python3 main.py watchlist
 python3 main.py note 4 "Check seller history and traffic quality"
+python3 main.py github
+python3 main.py signals
+python3 main.py signals github
 ```
 
 ## Architecture
@@ -57,14 +62,14 @@ Observer -> Raw Facts -> Signal -> SQLite Timeline -> Intelligence Report
 ```text
 bend_score/
   core/                  Observer orchestration and intelligence runs
-  observers/             Observer base class, registry, fake observer, future source stubs
+  observers/             Observer base class, registry, fake observer, GitHub observer
   models/                Listing, watchlist, and standardized Signal models
   database/              SQLite repository, listings, watchlist, signals, signal history
   reports/               Markdown intelligence briefings
   utils/                 Confidence and config helpers
   scoring/               Existing Bend Score acquisition scoring
   analysis/              Rule-based business insights
-  ai/                    Placeholder only; no AI calls in V3
+  ai/                    Placeholder only; no AI calls in V4
 config/
   observers.yaml         Enable or disable observers without code edits
 data/
@@ -152,25 +157,78 @@ fake_opportunity:
   enabled: true
 
 github:
-  enabled: false
+  enabled: true
+  queries:
+    developer_tools:
+      enabled: true
+      query: "stars:>500 language:Python pushed:>2025-01-01"
+    ai_tools:
+      enabled: true
+      query: "AI stars:>1000 pushed:>2025-01-01"
+    automation:
+      enabled: true
+      query: "automation stars:>300 pushed:>2025-01-01"
+    abandoned_popular:
+      enabled: true
+      query: "stars:>1000 pushed:<2024-01-01"
+    chrome_extensions:
+      enabled: true
+      query: "chrome extension stars:>200"
 
 reddit:
   enabled: false
 ```
 
-## Current Observer
+## GitHub Observer
 
-V3 includes one real reference observer:
+V4 adds the first real internet-connected observer:
+
+- `GitHub Observer`
+
+The GitHub Observer searches public repositories for developer tools, AI tools, automation projects, abandoned popular repos, and Chrome extension opportunities. It collects repository metadata such as stars, forks, issues, language, license, topics, homepage, owner, created date, pushed date, archive status, and default branch.
+
+It generates rule-based signals such as:
+
+- `github_fast_growth_candidate`
+- `github_abandoned_popular_repo`
+- `github_commercial_potential`
+- `github_developer_tool`
+- `github_ai_tool`
+- `github_automation_tool`
+- `github_high_issue_demand`
+- `github_no_homepage_opportunity`
+
+Use:
+
+```bash
+python3 main.py github
+python3 main.py signals github
+```
+
+### GitHub Token
+
+`GITHUB_TOKEN` is optional. Without it, the observer still works through unauthenticated public API requests, but GitHub rate limits are lower.
+
+Add a token to your shell or `.env` workflow:
+
+```bash
+export GITHUB_TOKEN="your_token_here"
+```
+
+`.env.example` includes the variable name for reference.
+
+## Fake Opportunity Observer
+
+V4 keeps the reference fake observer:
 
 - `Fake Opportunity Observer`
 
-It converts the existing sample opportunity generator into normalized signals. This preserves the V1/V2 demo data while proving the V3 observer framework.
+It converts the existing sample opportunity generator into normalized signals. This preserves the V1/V2 demo data while proving the observer framework.
 
 ## Future Observer Examples
 
 Future observers can plug into the same architecture:
 
-- GitHub repository growth
 - Reddit niche demand
 - Product Hunt launches
 - Google Trends movement
@@ -195,6 +253,24 @@ A small observer should be possible in under 100 lines because it only needs to 
 - Statistics
 - Observer Summary
 - Recommendations
+- GitHub Intelligence, when GitHub is enabled
+
+The GitHub section includes:
+
+- Fast Growth Candidates
+- Abandoned Popular Repos
+- Commercial Potential
+- AI / Automation Tools
+- No Homepage Opportunities
+- High Issue Demand
+
+## Limitations
+
+- GitHub search results are limited by public API rate limits.
+- Signals are heuristics, not acquisition advice.
+- The observer does not scrape repository websites or marketplaces.
+- Same-day duplicate GitHub signals for the same repo and signal type are skipped.
+- No private repository access is used.
 
 ## Roadmap
 

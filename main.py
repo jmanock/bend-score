@@ -13,6 +13,10 @@ def main() -> None:
     subparsers.add_parser("top", help="Show the highest scoring businesses.")
     subparsers.add_parser("stats", help="Show portfolio analytics.")
     subparsers.add_parser("watchlist", help="Show watchlist items.")
+    subparsers.add_parser("github", help="Run only the GitHub observer.")
+
+    signals_parser = subparsers.add_parser("signals", help="Show recent signals.")
+    signals_parser.add_argument("observer", nargs="?")
 
     search_parser = subparsers.add_parser("search", help="Search listings by keyword.")
     search_parser.add_argument("query")
@@ -40,6 +44,10 @@ def main() -> None:
         app.watchlist()
     elif args.command == "note":
         app.note(args.listing_id, args.text)
+    elif args.command == "github":
+        app.github()
+    elif args.command == "signals":
+        app.signals(args.observer)
 
 
 if __name__ == "__main__":

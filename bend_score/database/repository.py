@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 from typing import Iterable
@@ -117,6 +118,8 @@ class ListingRepository:
         inserted: list[Signal] = []
         with self.connect() as connection:
             for signal in signals:
+                if self._is_duplicate_same_day_signal(connection, signal):
+                    continue
                 cursor = connection.execute(
                     """
                     INSERT INTO signals (
@@ -162,13 +165,47 @@ class ListingRepository:
                 inserted.append(signal)
         return inserted
 
-    def list_signals(self, limit: int = 100) -> list[Signal]:
+    def list_signals(self, limit: int = 100, observer: str | None = None) -> list[Signal]:
         with self.connect() as connection:
-            rows = connection.execute(
-                "SELECT * FROM signals ORDER BY timestamp DESC, id DESC LIMIT ?",
-                (limit,),
-            ).fetchall()
+            if observer:
+                rows = connection.execute(
+                    "SELECT * FROM signals WHERE observer = ? ORDER BY timestamp DESC, id DESC LIMIT ?",
+                    (observer, limit),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM signals ORDER BY timestamp DESC, id DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
             return [Signal.from_row(row) for row in rows]
+
+    def _is_duplicate_same_day_signal(self, connection: sqlite3.Connection, signal: Signal) -> bool:
+        full_name = signal.metadata.get("github_full_name")
+        signal_type = signal.metadata.get("github_signal_type")
+        if not full_name or not signal_type:
+            return False
+        day = signal.timestamp[:10]
+        rows = connection.execute(
+            """
+            SELECT metadata
+            FROM signals
+            WHERE observer = ?
+              AND signal_type = ?
+              AND substr(timestamp, 1, 10) = ?
+            """,
+            (signal.observer, signal.signal_type, day),
+        ).fetchall()
+        for row in rows:
+            try:
+                metadata = json.loads(row["metadata"] or "{}")
+            except json.JSONDecodeError:
+                continue
+            if (
+                metadata.get("github_full_name") == full_name
+                and metadata.get("github_signal_type") == signal_type
+            ):
+                return True
+        return False
 
     def signal_stats(self) -> dict[str, object]:
         with self.connect() as connection:

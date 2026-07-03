@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from bend_score.models import Listing, WatchlistItem
+from bend_score.models import Listing, Signal, WatchlistItem
 
 
 RESET = "\033[0m"
@@ -70,6 +70,21 @@ def print_stats(stats: dict[str, object]) -> None:
         print(f"  {category}: {count}")
 
 
+def print_signals(signals: list[Signal]) -> None:
+    if not signals:
+        print("No signals found.")
+        return
+    for signal in signals:
+        print(
+            f"{_score_color(signal.confidence)}{signal.confidence:>3}%{RESET}  "
+            f"{_recommendation_color(signal.recommendation)}{signal.recommendation:<8}{RESET}  "
+            f"{signal.observer:<16} {signal.title}"
+        )
+        print(f"     {signal.signal_type} | {signal.impact} impact | {signal.timestamp}")
+        if signal.metadata.get("github_html_url"):
+            print(f"     {signal.metadata['github_html_url']}")
+
+
 def _listing_line(index: int, listing: Listing) -> str:
     return (
         f"{index:>2}. {_score_color(listing.bend_score or 0)}{listing.bend_score:>5.1f}/100{RESET}  "
@@ -92,6 +107,8 @@ def _score_color(score: float) -> str:
 
 def _recommendation_color(recommendation: str) -> str:
     if recommendation == "BUY":
+        return GREEN
+    if recommendation == "BUILD":
         return GREEN
     if recommendation == "RESEARCH":
         return CYAN

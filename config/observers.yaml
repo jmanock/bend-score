@@ -2,8 +2,23 @@ fake_opportunity:
   enabled: true
 
 github:
-  enabled: false
+  enabled: true
+  queries:
+    developer_tools:
+      enabled: true
+      query: "stars:>500 language:Python pushed:>2025-01-01"
+    ai_tools:
+      enabled: true
+      query: "AI stars:>1000 pushed:>2025-01-01"
+    automation:
+      enabled: true
+      query: "automation stars:>300 pushed:>2025-01-01"
+    abandoned_popular:
+      enabled: true
+      query: "stars:>1000 pushed:<2024-01-01"
+    chrome_extensions:
+      enabled: true
+      query: "chrome extension stars:>200"
 
 reddit:
   enabled: false
-

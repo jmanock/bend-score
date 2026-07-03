@@ -9,6 +9,8 @@ from bend_score.config import SEED_COUNT
 from bend_score.core.intelligence import run_observers
 from bend_score.database.repository import ListingRepository
 from bend_score.logging_utils import configure_logging
+from bend_score.observers.github import GitHubObserver
+from bend_score.observers.registry import ObserverRegistry
 from bend_score.recommendations import apply_recommendation
 from bend_score.reports.markdown import write_intelligence_reports
 from bend_score import ui
@@ -32,7 +34,7 @@ def run() -> None:
             print(f"{ui.GREEN}✓{ui.RESET} {result.label}")
 
         inserted_signals = repository.insert_signals(intelligence.signals)
-        logger.info("signals generated count=%s", len(inserted_signals))
+        logger.info("signals generated count=%s", len(intelligence.signals))
         logger.info("timeline updated count=%s", len(inserted_signals))
 
         listings = refresh_scores(repository, logger)
@@ -50,8 +52,8 @@ def run() -> None:
         ui.header()
         ui.section("Observer Run")
         print(f"{ui.GREEN}✓{ui.RESET} Observer loaded")
-        print(f"{ui.GREEN}✓{ui.RESET} Signals generated: {len(inserted_signals)}")
-        print(f"{ui.GREEN}✓{ui.RESET} Timeline updated")
+        print(f"{ui.GREEN}✓{ui.RESET} Signals generated: {len(intelligence.signals)}")
+        print(f"{ui.GREEN}✓{ui.RESET} Timeline updated: {len(inserted_signals)} new snapshots")
         print(f"{ui.GREEN}✓{ui.RESET} Confidence calculated: {intelligence.average_confidence:.1f}% average")
         print(f"{ui.GREEN}✓{ui.RESET} Intelligence report generated")
 
@@ -60,7 +62,8 @@ def run() -> None:
             print(f"{result.raw_count} opportunities from {result.label}")
 
         ui.section("Generated")
-        print(f"{len(inserted_signals)} signals")
+        print(f"{len(intelligence.signals)} signals")
+        print(f"{len(inserted_signals)} new timeline snapshots")
         print(f"Highest Confidence: {intelligence.highest_confidence}%")
 
         ui.section("Top Opportunities")
@@ -132,6 +135,45 @@ def note(listing_id: int, text: str) -> None:
     item = repository.append_note(listing_id, text)
     title = item.listing.title if item.listing else f"Listing #{listing_id}"
     print(f"Added note to #{listing_id}: {title}")
+
+
+def github() -> None:
+    logger = configure_logging()
+    repository = _ready_repository()
+    enabled_names = {observer.name for observer in ObserverRegistry.enabled()}
+    if "github" not in enabled_names:
+        ui.header("GitHub Observer")
+        print("GitHub Observer is disabled in config/observers.yaml.")
+        print("Set github.enabled: true to run it.")
+        return
+
+    observer = GitHubObserver()
+    print("Running GitHub Observer...")
+    result = observer.run()
+    inserted = repository.insert_signals(result.signals)
+    logger.info("GitHub observer runtime %.3fs", result.runtime_seconds)
+    logger.info("GitHub signals generated count=%s inserted=%s", len(result.signals), len(inserted))
+
+    ui.header("GitHub Intelligence")
+    print(f"Collected repositories: {result.raw_count}")
+    print(f"Generated signals: {len(result.signals)}")
+    print(f"Stored new signals: {len(inserted)}")
+    print(f"Runtime: {result.runtime_seconds:.3f}s")
+    if not observer.token:
+        print("Warning: GITHUB_TOKEN is not set, so GitHub API rate limits are lower.")
+    if observer.errors:
+        print("Warnings:")
+        for error in observer.errors:
+            print(f"- {error}")
+    ui.section("Recent GitHub Signals")
+    preview = inserted[:25] if inserted else repository.list_signals(limit=25, observer="github")
+    ui.print_signals(preview)
+
+
+def signals(observer: str | None = None) -> None:
+    repository = _ready_repository()
+    ui.header("Signals" if not observer else f"Signals: {observer}")
+    ui.print_signals(repository.list_signals(limit=25, observer=observer))
 
 
 def _ready_repository() -> ListingRepository:

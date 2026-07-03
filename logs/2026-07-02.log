@@ -26,3 +26,75 @@
 2026-07-02 07:57:40,604 INFO scores calculated count=15
 2026-07-02 07:57:40,606 INFO reports generated latest=/Users/jonmanock/Documents/Codex/bend-score/reports/latest.md dated=/Users/jonmanock/Documents/Codex/bend-score/reports/2026-07-02.md
 2026-07-02 07:57:40,607 INFO runtime 0.009s
+2026-07-02 08:08:26,620 INFO GitHub observer started
+2026-07-02 08:08:26,620 WARNING GitHub token missing; using lower unauthenticated rate limits
+2026-07-02 08:08:26,620 INFO GitHub query run name=developer_tools query=stars:>500 language:Python pushed:>2025-01-01
+2026-07-02 08:08:27,508 INFO GitHub repos found query=developer_tools count=20
+2026-07-02 08:08:27,509 INFO GitHub query run name=ai_tools query=AI stars:>1000 pushed:>2025-01-01
+2026-07-02 08:08:28,238 INFO GitHub repos found query=ai_tools count=20
+2026-07-02 08:08:28,239 INFO GitHub query run name=automation query=automation stars:>300 pushed:>2025-01-01
+2026-07-02 08:08:29,172 INFO GitHub repos found query=automation count=20
+2026-07-02 08:08:29,172 INFO GitHub query run name=abandoned_popular query=stars:>1000 pushed:<2024-01-01
+2026-07-02 08:08:30,089 INFO GitHub repos found query=abandoned_popular count=20
+2026-07-02 08:08:30,089 INFO GitHub query run name=chrome_extensions query=chrome extension stars:>200
+2026-07-02 08:08:31,117 INFO GitHub repos found query=chrome_extensions count=20
+2026-07-02 08:08:31,118 INFO GitHub observer repos collected count=90
+2026-07-02 08:08:31,126 INFO GitHub signals generated count=396
+2026-07-02 08:08:31,229 INFO GitHub observer runtime 4.507s
+2026-07-02 08:08:31,229 INFO GitHub signals generated count=396 inserted=396
+2026-07-02 08:08:41,358 INFO database created
+2026-07-02 08:08:41,358 INFO GitHub observer started
+2026-07-02 08:08:41,358 WARNING GitHub token missing; using lower unauthenticated rate limits
+2026-07-02 08:08:41,358 INFO GitHub query run name=developer_tools query=stars:>500 language:Python pushed:>2025-01-01
+2026-07-02 08:08:41,707 INFO GitHub repos found query=developer_tools count=20
+2026-07-02 08:08:41,707 INFO GitHub query run name=ai_tools query=AI stars:>1000 pushed:>2025-01-01
+2026-07-02 08:08:42,050 INFO GitHub repos found query=ai_tools count=20
+2026-07-02 08:08:42,050 INFO GitHub query run name=automation query=automation stars:>300 pushed:>2025-01-01
+2026-07-02 08:08:42,335 INFO GitHub repos found query=automation count=20
+2026-07-02 08:08:42,335 INFO GitHub query run name=abandoned_popular query=stars:>1000 pushed:<2024-01-01
+2026-07-02 08:08:42,682 INFO GitHub repos found query=abandoned_popular count=20
+2026-07-02 08:08:42,682 INFO GitHub query run name=chrome_extensions query=chrome extension stars:>200
+2026-07-02 08:08:43,025 INFO GitHub repos found query=chrome_extensions count=20
+2026-07-02 08:08:43,026 INFO GitHub observer repos collected count=90
+2026-07-02 08:08:43,032 INFO GitHub signals generated count=396
+2026-07-02 08:08:43,141 INFO signals generated count=35
+2026-07-02 08:08:43,141 INFO timeline updated count=35
+2026-07-02 08:08:43,142 INFO scores calculated count=15
+2026-07-02 08:08:43,150 INFO reports generated latest=/Users/jonmanock/Documents/Codex/bend-score/reports/latest.md dated=/Users/jonmanock/Documents/Codex/bend-score/reports/2026-07-02.md
+2026-07-02 08:08:43,151 INFO runtime 1.793s
+2026-07-02 08:09:32,597 INFO GitHub observer started
+2026-07-02 08:09:32,597 WARNING GitHub token missing; using lower unauthenticated rate limits
+2026-07-02 08:09:32,597 INFO GitHub query run name=developer_tools query=stars:>500 language:Python pushed:>2025-01-01
+2026-07-02 08:09:33,519 INFO GitHub repos found query=developer_tools count=20
+2026-07-02 08:09:33,520 INFO GitHub query run name=ai_tools query=AI stars:>1000 pushed:>2025-01-01
+2026-07-02 08:09:34,479 INFO GitHub repos found query=ai_tools count=20
+2026-07-02 08:09:34,479 INFO GitHub query run name=automation query=automation stars:>300 pushed:>2025-01-01
+2026-07-02 08:09:35,443 INFO GitHub repos found query=automation count=20
+2026-07-02 08:09:35,444 INFO GitHub query run name=abandoned_popular query=stars:>1000 pushed:<2024-01-01
+2026-07-02 08:09:36,289 INFO GitHub repos found query=abandoned_popular count=20
+2026-07-02 08:09:36,289 INFO GitHub query run name=chrome_extensions query=chrome extension stars:>200
+2026-07-02 08:09:37,252 INFO GitHub repos found query=chrome_extensions count=20
+2026-07-02 08:09:37,253 INFO GitHub observer repos collected count=90
+2026-07-02 08:09:37,261 INFO GitHub signals generated count=396
+2026-07-02 08:09:37,360 INFO GitHub observer runtime 4.664s
+2026-07-02 08:09:37,360 INFO GitHub signals generated count=396 inserted=0
+2026-07-02 08:09:56,062 INFO database created
+2026-07-02 08:09:56,063 INFO GitHub observer started
+2026-07-02 08:09:56,063 WARNING GitHub token missing; using lower unauthenticated rate limits
+2026-07-02 08:09:56,063 INFO GitHub query run name=developer_tools query=stars:>500 language:Python pushed:>2025-01-01
+2026-07-02 08:09:56,984 INFO GitHub repos found query=developer_tools count=20
+2026-07-02 08:09:56,984 INFO GitHub query run name=ai_tools query=AI stars:>1000 pushed:>2025-01-01
+2026-07-02 08:09:57,860 INFO GitHub repos found query=ai_tools count=20
+2026-07-02 08:09:57,860 INFO GitHub query run name=automation query=automation stars:>300 pushed:>2025-01-01
+2026-07-02 08:09:58,772 INFO GitHub repos found query=automation count=20
+2026-07-02 08:09:58,772 INFO GitHub query run name=abandoned_popular query=stars:>1000 pushed:<2024-01-01
+2026-07-02 08:09:59,785 INFO GitHub repos found query=abandoned_popular count=20
+2026-07-02 08:09:59,785 INFO GitHub query run name=chrome_extensions query=chrome extension stars:>200
+2026-07-02 08:10:00,654 INFO GitHub repos found query=chrome_extensions count=20
+2026-07-02 08:10:00,655 INFO GitHub observer repos collected count=90
+2026-07-02 08:10:00,664 INFO GitHub signals generated count=396
+2026-07-02 08:10:00,772 INFO signals generated count=431
+2026-07-02 08:10:00,772 INFO timeline updated count=35
+2026-07-02 08:10:00,773 INFO scores calculated count=15
+2026-07-02 08:10:00,781 INFO reports generated latest=/Users/jonmanock/Documents/Codex/bend-score/reports/latest.md dated=/Users/jonmanock/Documents/Codex/bend-score/reports/2026-07-02.md
+2026-07-02 08:10:00,782 INFO runtime 4.720s
