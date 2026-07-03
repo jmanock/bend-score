@@ -2,7 +2,7 @@
 
 Bend Score is a terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
 
-V4 is built around **Observers** and **Signals**. Observers collect facts from a source. Signals normalize those facts into one standard intelligence format. The database stores every signal snapshot so Bend Score can build a timeline of opportunity intelligence over time.
+V5 adds manual marketplace intake on top of the observer/signal intelligence platform. You can now paste or import real listings from Flippa, Acquire.com, Microns, Empire Flippers, newsletters, domains, or any marketplace, then immediately score, rank, watch, and report on them.
 
 Bend Score uses GitHub's public REST API for the GitHub Observer. It does not use paid APIs, OpenAI calls, marketplace scraping, cloud services, authentication, or a web dashboard.
 
@@ -51,6 +51,10 @@ python3 main.py note 4 "Check seller history and traffic quality"
 python3 main.py github
 python3 main.py signals
 python3 main.py signals github
+python3 main.py import-csv examples/sample_listings.csv
+python3 main.py add-listing
+python3 main.py listings
+python3 main.py listing 21
 ```
 
 ## Architecture
@@ -66,10 +70,13 @@ bend_score/
   models/                Listing, watchlist, and standardized Signal models
   database/              SQLite repository, listings, watchlist, signals, signal history
   reports/               Markdown intelligence briefings
+  intake/                CSV/manual listing validation and normalization
   utils/                 Confidence and config helpers
   scoring/               Existing Bend Score acquisition scoring
   analysis/              Rule-based business insights
-  ai/                    Placeholder only; no AI calls in V4
+  ai/                    Placeholder only; no AI calls in V5
+examples/
+  sample_listings.csv    Example marketplace listing import file
 config/
   observers.yaml         Enable or disable observers without code edits
 data/
@@ -141,6 +148,91 @@ Current tables:
 - `signal_history`
 
 Every run inserts new rows into `signals` and `signal_history`. History is never overwritten. This creates the timeline Bend Score will later use for acceleration, trend, and anomaly detection.
+
+## Manual Intake
+
+V5 supports two no-scraping intake paths:
+
+```bash
+python3 main.py import-csv examples/sample_listings.csv
+python3 main.py add-listing
+```
+
+Imported and manually added listings are normalized, validated, scored, stored in SQLite, and included in:
+
+- `python3 main.py run`
+- `python3 main.py top`
+- `python3 main.py stats`
+- `python3 main.py listings`
+- `reports/latest.md`
+
+### CSV Format
+
+Expected CSV columns:
+
+```text
+title
+url
+source
+category
+asking_price
+monthly_revenue
+monthly_profit
+traffic_estimate
+description
+seller_notes
+tech_stack
+```
+
+Missing optional fields are allowed. Numeric fields may include commas or dollar signs. URL is optional, but if present it must start with `http://` or `https://`.
+
+Supported source names:
+
+- Flippa
+- Acquire
+- Microns
+- Empire Flippers
+- FE International
+- Motion Invest
+- Manual
+- Other
+
+Unknown sources are normalized to `Other`.
+
+### Import Report
+
+After importing, Bend Score prints:
+
+- rows processed
+- rows imported
+- duplicates skipped
+- errors
+- highest scoring imported listing
+
+Duplicates are detected by normalized title + URL.
+
+### Listing Views
+
+Use:
+
+```bash
+python3 main.py listings
+python3 main.py listing <id>
+```
+
+`listings` shows recent listings with ID, title, source, category, asking price, revenue, profit, and Bend Score.
+
+`listing <id>` shows all listing fields, score breakdown, recommendation, improvement ideas, and watchlist status.
+
+### Sample Workflow
+
+```bash
+python3 main.py import-csv examples/sample_listings.csv
+python3 main.py listings
+python3 main.py top
+python3 main.py listing 21
+python3 main.py run
+```
 
 ## Observer Configuration
 

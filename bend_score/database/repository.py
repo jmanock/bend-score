@@ -249,9 +249,67 @@ class ListingRepository:
                 [listing.__dict__ for listing in listings],
             )
 
+    def add_listing(self, listing: Listing) -> Listing:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO listings (
+                    title, url, source, category, asking_price, monthly_revenue,
+                    monthly_profit, traffic_estimate, description, seller_notes,
+                    tech_stack, created_at, updated_at, bend_score, recommendation,
+                    recommendation_explanation
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    listing.title,
+                    listing.url,
+                    listing.source,
+                    listing.category,
+                    listing.asking_price,
+                    listing.monthly_revenue,
+                    listing.monthly_profit,
+                    listing.traffic_estimate,
+                    listing.description,
+                    listing.seller_notes,
+                    listing.tech_stack,
+                    listing.created_at,
+                    listing.updated_at,
+                    listing.bend_score,
+                    listing.recommendation,
+                    listing.recommendation_explanation,
+                ),
+            )
+            listing.id = cursor.lastrowid
+        return listing
+
+    def is_duplicate_listing(self, listing: Listing) -> bool:
+        title = listing.title.strip().lower()
+        url = listing.url.strip().lower()
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT id
+                FROM listings
+                WHERE lower(trim(title)) = ?
+                  AND lower(trim(url)) = ?
+                LIMIT 1
+                """,
+                (title, url),
+            ).fetchone()
+            return row is not None
+
     def list_all(self) -> list[Listing]:
         with self.connect() as connection:
             rows = connection.execute("SELECT * FROM listings ORDER BY id").fetchall()
+            return [Listing.from_row(row) for row in rows]
+
+    def recent_listings(self, limit: int = 25) -> list[Listing]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM listings ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
             return [Listing.from_row(row) for row in rows]
 
     def update_scores(self, listings: Iterable[Listing]) -> None:
@@ -371,6 +429,14 @@ class ListingRepository:
                 (listing_id,),
             ).fetchone()
             return self._watchlist_from_row(row) if row else None
+
+    def watchlist_status(self, listing_id: int) -> str | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT status FROM watchlist WHERE listing_id = ?",
+                (listing_id,),
+            ).fetchone()
+            return row["status"] if row else None
 
     def list_watchlist(self) -> list[WatchlistItem]:
         with self.connect() as connection:

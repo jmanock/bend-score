@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from bend_score.ai.ideas import improvement_ideas
 from bend_score.models import Listing, Signal, WatchlistItem
+from bend_score.scoring.bend_score import calculate_bend_score
 
 
 RESET = "\033[0m"
@@ -39,6 +41,50 @@ def print_listings(listings: list[Listing], limit: int | None = None) -> None:
             f"Profit {_money(listing.monthly_profit)}/mo | "
             f"Traffic {listing.traffic_estimate:,}"
         )
+
+
+def print_recent_listings(listings: list[Listing]) -> None:
+    if not listings:
+        print("No listings found.")
+        return
+    for listing in listings:
+        print(
+            f"#{listing.id:<4} {listing.title} | {listing.source} | {listing.category} | "
+            f"Ask {_money(listing.asking_price)} | Rev {_money(listing.monthly_revenue)}/mo | "
+            f"Profit {_money(listing.monthly_profit)}/mo | Score {(listing.bend_score or 0):.1f}"
+        )
+
+
+def print_listing_detail(listing: Listing, watchlist_status: str | None = None) -> None:
+    result = calculate_bend_score(listing)
+    print(f"ID: {listing.id}")
+    print(f"Title: {listing.title}")
+    print(f"URL: {listing.url or 'n/a'}")
+    print(f"Source: {listing.source}")
+    print(f"Category: {listing.category}")
+    print(f"Asking price: {_money(listing.asking_price)}")
+    print(f"Monthly revenue: {_money(listing.monthly_revenue)}")
+    print(f"Monthly profit: {_money(listing.monthly_profit)}")
+    print(f"Traffic estimate: {listing.traffic_estimate:,}")
+    print(f"Description: {listing.description or 'n/a'}")
+    print(f"Seller notes: {listing.seller_notes or 'n/a'}")
+    print(f"Tech stack: {listing.tech_stack or 'n/a'}")
+    print(f"Created: {listing.created_at}")
+    print(f"Updated: {listing.updated_at}")
+    print(f"Bend Score: {(listing.bend_score or result.total):.1f}/100")
+    print(f"Recommendation: {listing.recommendation or result.recommendation}")
+    print(f"Recommendation reason: {listing.recommendation_explanation or result.recommendation_explanation}")
+    print(f"Watchlist status: {watchlist_status or 'Not watched'}")
+    print()
+    print("Score breakdown:")
+    for name, component in result.components.items():
+        label = name.replace("_", " ").title()
+        print(f"  {label}: {component['score']}/10 ({component['confidence']}% confidence)")
+        print(f"    {component['explanation']}")
+    print()
+    print("Improvement ideas:")
+    for idea in improvement_ideas(listing):
+        print(f"  - {idea}")
 
 
 def print_watchlist(items: list[WatchlistItem]) -> None:

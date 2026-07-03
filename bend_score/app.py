@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 
 from bend_score.analysis.insights import portfolio_observations
 from bend_score.collectors.sample_data import sample_listings
 from bend_score.config import SEED_COUNT
 from bend_score.core.intelligence import run_observers
 from bend_score.database.repository import ListingRepository
+from bend_score.intake.listings import ImportResult, listing_from_mapping, load_csv_rows
 from bend_score.logging_utils import configure_logging
 from bend_score.observers.github import GitHubObserver
 from bend_score.observers.registry import ObserverRegistry
@@ -174,6 +176,96 @@ def signals(observer: str | None = None) -> None:
     repository = _ready_repository()
     ui.header("Signals" if not observer else f"Signals: {observer}")
     ui.print_signals(repository.list_signals(limit=25, observer=observer))
+
+
+def import_csv(path: str) -> None:
+    repository = _ready_repository()
+    result = import_csv_file(Path(path), repository)
+    ui.header("CSV Import")
+    print(f"Rows processed: {result.rows_processed}")
+    print(f"Rows imported: {len(result.imported)}")
+    print(f"Duplicates skipped: {result.duplicates_skipped}")
+    print(f"Errors: {len(result.errors)}")
+    for error in result.errors:
+        print(f"- {error}")
+    if result.highest_scoring:
+        listing = result.highest_scoring
+        print(
+            f"Highest scoring imported listing: #{listing.id} {listing.title} "
+            f"({listing.bend_score:.1f}/100)"
+        )
+    else:
+        print("Highest scoring imported listing: n/a")
+
+
+def import_csv_file(path: Path, repository: ListingRepository) -> ImportResult:
+    result = ImportResult()
+    if not path.exists():
+        result.errors.append(f"File not found: {path}")
+        return result
+
+    for row_number, row in enumerate(load_csv_rows(path), start=2):
+        result.rows_processed += 1
+        try:
+            listing = listing_from_mapping(row)
+        except ValueError as exc:
+            result.errors.append(f"Row {row_number}: {exc}")
+            continue
+        if repository.is_duplicate_listing(listing):
+            result.duplicates_skipped += 1
+            continue
+        result.imported.append(repository.add_listing(listing))
+    return result
+
+
+def add_listing() -> None:
+    repository = _ready_repository()
+    fields = [
+        ("title", "Title"),
+        ("url", "URL"),
+        ("source", "Source"),
+        ("category", "Category"),
+        ("asking_price", "Asking price"),
+        ("monthly_revenue", "Monthly revenue"),
+        ("monthly_profit", "Monthly profit"),
+        ("traffic_estimate", "Traffic estimate"),
+        ("description", "Description"),
+        ("seller_notes", "Notes"),
+        ("tech_stack", "Tech stack"),
+    ]
+    data: dict[str, str] = {}
+    for key, label in fields:
+        data[key] = input(f"{label}: ")
+
+    try:
+        listing = create_manual_listing(data, repository)
+    except ValueError as exc:
+        print(f"Could not add listing: {exc}")
+        return
+    print(f"Added listing #{listing.id}: {listing.title} ({listing.bend_score:.1f}/100)")
+
+
+def create_manual_listing(data: dict[str, object], repository: ListingRepository) -> object:
+    listing = listing_from_mapping({**data, "source": data.get("source") or "Manual"})
+    if repository.is_duplicate_listing(listing):
+        raise ValueError("duplicate listing detected by title and URL.")
+    return repository.add_listing(listing)
+
+
+def listings() -> None:
+    repository = _ready_repository()
+    ui.header("Recent Listings")
+    ui.print_recent_listings(repository.recent_listings())
+
+
+def listing_detail(listing_id: int) -> None:
+    repository = _ready_repository()
+    listing = repository.get_listing(listing_id)
+    if not listing:
+        print(f"Listing #{listing_id} not found.")
+        return
+    ui.header(f"Listing #{listing_id}")
+    ui.print_listing_detail(listing, repository.watchlist_status(listing_id))
 
 
 def _ready_repository() -> ListingRepository:

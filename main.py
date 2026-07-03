@@ -14,6 +14,14 @@ def main() -> None:
     subparsers.add_parser("stats", help="Show portfolio analytics.")
     subparsers.add_parser("watchlist", help="Show watchlist items.")
     subparsers.add_parser("github", help="Run only the GitHub observer.")
+    subparsers.add_parser("add-listing", help="Manually add a listing through terminal prompts.")
+    subparsers.add_parser("listings", help="Show recent listings.")
+
+    import_parser = subparsers.add_parser("import-csv", help="Import marketplace listings from CSV.")
+    import_parser.add_argument("path")
+
+    listing_parser = subparsers.add_parser("listing", help="Show full detail for one listing.")
+    listing_parser.add_argument("listing_id", type=int)
 
     signals_parser = subparsers.add_parser("signals", help="Show recent signals.")
     signals_parser.add_argument("observer", nargs="?")
@@ -48,6 +56,14 @@ def main() -> None:
         app.github()
     elif args.command == "signals":
         app.signals(args.observer)
+    elif args.command == "import-csv":
+        app.import_csv(args.path)
+    elif args.command == "add-listing":
+        app.add_listing()
+    elif args.command == "listings":
+        app.listings()
+    elif args.command == "listing":
+        app.listing_detail(args.listing_id)
 
 
 if __name__ == "__main__":

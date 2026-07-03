@@ -78,6 +78,8 @@ def build_intelligence_report(
         lines.append(f"- Average Bend Score: {average_score:.1f}")
     lines.append("")
 
+    lines.extend(_marketplace_listing_section(listings))
+
     lines.extend(["## Observer Summary", ""])
     if not intelligence.observer_results:
         lines.append("- No observers enabled.")
@@ -129,6 +131,21 @@ def _recommendation_summary(signals: list[Signal]) -> list[str]:
         f"{recommendation}: {counts.get(recommendation, 0)} signals"
         for recommendation in ["BUY", "BUILD", "WATCH", "RESEARCH", "IGNORE"]
     ]
+
+
+def _marketplace_listing_section(listings: list[Listing]) -> list[str]:
+    lines = ["## Marketplace Listings", ""]
+    if not listings:
+        return lines + ["No listings available.", ""]
+    ranked = sorted(listings, key=lambda listing: listing.bend_score or 0, reverse=True)
+    for listing in ranked[:10]:
+        lines.append(
+            f"- #{listing.id} **{listing.title}** - {listing.source}, {listing.category}, "
+            f"{listing.bend_score:.1f}/100, asking {_money(listing.asking_price)}, "
+            f"revenue {_money(listing.monthly_revenue)}/mo, profit {_money(listing.monthly_profit)}/mo"
+        )
+    lines.append("")
+    return lines
 
 
 def _github_section(signals: list[Signal]) -> list[str]:
