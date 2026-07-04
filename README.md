@@ -2,7 +2,7 @@
 
 Bend Score is a terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
 
-V5 adds manual marketplace intake on top of the observer/signal intelligence platform. You can now paste or import real listings from Flippa, Acquire.com, Microns, Empire Flippers, newsletters, domains, or any marketplace, then immediately score, rank, watch, and report on them.
+V5 adds Morning Content Engine signal export on top of the observer, marketplace intake, scoring, reports, recommendations, and watchlist workflow. You can paste or import real listings, score them, and export the best opportunities as standardized signal JSON files.
 
 Bend Score uses GitHub's public REST API for the GitHub Observer. It does not use paid APIs, OpenAI calls, marketplace scraping, cloud services, authentication, or a web dashboard.
 
@@ -55,6 +55,8 @@ python3 main.py import-csv examples/sample_listings.csv
 python3 main.py add-listing
 python3 main.py listings
 python3 main.py listing 21
+python3 main.py export-signals
+python3 main.py signals-outbox
 ```
 
 ## Architecture
@@ -87,6 +89,74 @@ reports/
   latest.md              Current daily briefing
 tests/
   unit tests
+signals/
+  outbox/                Morning Content Engine signal JSON exports
+  archive/               Optional storage for handled exported signals
+```
+
+## Morning Content Engine Signal Export
+
+V5 can export high-value Bend Score opportunities as standardized signal JSON files for Morning Content Engine.
+
+Run:
+
+```bash
+python3 main.py export-signals
+python3 main.py signals-outbox
+```
+
+Signals are written to:
+
+```text
+signals/outbox/
+```
+
+The exporter uses the Morning Content Engine Signal Contract:
+
+- `source_project`: `bend-score`
+- `source_type`: `opportunity`
+- `brand`: `Bend Score`
+- `title`
+- `summary`
+- `url`
+- `category`: `business-opportunity`
+- `priority`
+- `confidence`
+- `tags`
+- `metadata`
+
+Export selection rules:
+
+- Bend Score is `70` or higher
+- or recommendation is `BUY`, `BUILD`, `WATCH`, or `RESEARCH`
+- or confidence is `80` or higher
+
+`IGNORE` and `PASS` items are not exported.
+
+Each signal metadata object includes:
+
+- original listing id
+- Bend Score
+- recommendation
+- asking price
+- monthly revenue
+- monthly profit
+- source
+- category
+- score breakdown
+
+Filenames are stable per listing/source/date, so running export repeatedly on the same day will not create duplicates.
+
+Example workflow:
+
+```bash
+cd ~/Documents/Codex/bend-score
+python3 main.py run
+python3 main.py export-signals
+
+cd ~/Documents/Codex/morning-content-engine
+python main.py collect-signals
+python main.py morning
 ```
 
 ## Observer Lifecycle

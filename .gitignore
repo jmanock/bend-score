@@ -6,4 +6,6 @@ venv/
 data/*.sqlite3
 reports/*.md
 logs/*.log
+signals/outbox/*.json
+signals/archive/*.json
 .DS_Store

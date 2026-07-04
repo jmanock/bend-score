@@ -9,6 +9,7 @@ from bend_score.collectors.sample_data import sample_listings
 from bend_score.config import SEED_COUNT
 from bend_score.core.intelligence import run_observers
 from bend_score.database.repository import ListingRepository
+from bend_score.exporters.morning_content import SIGNAL_OUTBOX, export_opportunities
 from bend_score.intake.listings import ImportResult, listing_from_mapping, load_csv_rows
 from bend_score.logging_utils import configure_logging
 from bend_score.observers.github import GitHubObserver
@@ -266,6 +267,26 @@ def listing_detail(listing_id: int) -> None:
         return
     ui.header(f"Listing #{listing_id}")
     ui.print_listing_detail(listing, repository.watchlist_status(listing_id))
+
+
+def export_signals() -> None:
+    repository = _ready_repository()
+    listings = repository.list_all()
+    summary = export_opportunities(listings)
+    ui.header("Morning Content Signal Export")
+    for line in summary.lines():
+        print(line)
+
+
+def signals_outbox() -> None:
+    SIGNAL_OUTBOX.mkdir(parents=True, exist_ok=True)
+    files = sorted(SIGNAL_OUTBOX.glob("*.json"))
+    ui.header("Signals Outbox")
+    if not files:
+        print("No signal files in signals/outbox.")
+        return
+    for path in files:
+        print(path)
 
 
 def _ready_repository() -> ListingRepository:

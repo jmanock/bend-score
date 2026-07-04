@@ -16,6 +16,8 @@ def main() -> None:
     subparsers.add_parser("github", help="Run only the GitHub observer.")
     subparsers.add_parser("add-listing", help="Manually add a listing through terminal prompts.")
     subparsers.add_parser("listings", help="Show recent listings.")
+    subparsers.add_parser("export-signals", help="Export high-value opportunities to signals/outbox.")
+    subparsers.add_parser("signals-outbox", help="List current Morning Content Engine signal files.")
 
     import_parser = subparsers.add_parser("import-csv", help="Import marketplace listings from CSV.")
     import_parser.add_argument("path")
@@ -64,6 +66,10 @@ def main() -> None:
         app.listings()
     elif args.command == "listing":
         app.listing_detail(args.listing_id)
+    elif args.command == "export-signals":
+        app.export_signals()
+    elif args.command == "signals-outbox":
+        app.signals_outbox()
 
 
 if __name__ == "__main__":
