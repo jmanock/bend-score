@@ -1,0 +1,31 @@
+{
+  "bend_score_change": 0.0,
+  "category": "GitHub Opportunity",
+  "current_bend_score": 57.8,
+  "current_founder_score": 73.2,
+  "current_recommendation": "\u2605\u2605\u2605\u2606\u2606 WATCH",
+  "first_seen": "2026-07-05T14:02:28+00:00",
+  "founder_score_change": 0.0,
+  "historical_bend_scores": [
+    57.8,
+    57.8,
+    57.8
+  ],
+  "historical_founder_scores": [
+    73.2,
+    73.2,
+    73.2
+  ],
+  "last_seen": "2026-07-05T14:29:33+00:00",
+  "notes": "",
+  "recommendation_change": "No change",
+  "recommendation_history": [
+    "\u2605\u2605\u2605\u2606\u2606 WATCH",
+    "\u2605\u2605\u2605\u2606\u2606 WATCH",
+    "\u2605\u2605\u2605\u2606\u2606 WATCH"
+  ],
+  "source": "GitHub",
+  "times_seen": 3,
+  "title": "GitHub Opportunity: GoogleChrome/chrome-extensions-samples",
+  "trend": "STABLE"
+}

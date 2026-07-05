@@ -17,6 +17,14 @@ from bend_score.memory import (
     trend_for_memory,
 )
 from bend_score.models import Listing, Signal, WatchlistItem
+from bend_score.intelligence.consensus import (
+    ConsensusOpportunity,
+    build_consensus,
+    executive_recommendation,
+    heat_rankings,
+    portfolio_allocation,
+    top_three_consensus,
+)
 from bend_score.scoring.bend_score import calculate_bend_score
 
 
@@ -76,6 +84,8 @@ def build_intelligence_report(
         key=lambda listing: ((listing.founder_score or 0), (listing.portfolio_fit or 0), (listing.bend_score or 0)),
         reverse=True,
     )
+    consensus = build_consensus(ranked, current_signals, memory_records)
+    top_three = top_three_consensus(consensus)
     lines = [
         "# Bend Score Morning Investment Memo",
         "",
@@ -85,17 +95,29 @@ def build_intelligence_report(
         "",
     ]
     if ranked:
-        top = ranked[0]
+        top = top_three[0].primary_listing if top_three and top_three[0].primary_listing else ranked[0]
         lines.append(
             f"- Top decision: **{top.title}** with Founder {(top.founder_score or 0):.0f}/100, "
             f"Portfolio Fit {(top.portfolio_fit or 0):.0f}/100, recommendation **{top.recommendation}**."
+        )
+    if consensus:
+        lines.append(
+            f"- Consensus opportunities identified: {len(consensus)}; hottest market: **{heat_rankings(consensus)[0].market}**."
         )
     lines.append(f"- Opportunities tracked in memory: {len(memory_records)}")
     lines.append(f"- Signals generated this run: {len(current_signals)}; timeline signals retained: {len(all_signals)}")
     lines.append(f"- Founder feedback notes stored: {len(feedback_entries)}")
     lines.append("")
 
-    lines.extend(_top_three_section(ranked[:3], memory_records))
+    lines.extend(_consensus_opportunities_section(consensus))
+    lines.extend(_top_three_consensus_section(top_three))
+    lines.extend(_observer_agreement_section(consensus))
+    lines.extend(_heat_rankings_section(consensus))
+    lines.extend(_portfolio_allocation_section(consensus))
+    lines.extend(_executive_recommendation_section(consensus))
+    github_signals = [signal for signal in current_signals if signal.observer == "github"]
+    if github_signals:
+        lines.extend(_github_intelligence_section(github_signals))
     lines.extend(_movers_section(movers))
     lines.extend(_clusters_section(clusters))
     lines.extend(_roadmap_section(roadmap))
@@ -103,6 +125,94 @@ def build_intelligence_report(
     lines.extend(_full_table_section(ranked, memory_records))
 
     return "\n".join(lines)
+
+
+def _consensus_opportunities_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Consensus Opportunities", ""]
+    if not opportunities:
+        return lines + ["No consensus opportunities yet. Run more observers to collect independent evidence.", ""]
+    for opportunity in opportunities[:8]:
+        lines.append(f"### {opportunity.title}")
+        lines.append(f"- Market: {opportunity.market}")
+        lines.append(f"- Consensus Score: {opportunity.consensus_score:.1f}/100")
+        lines.append(f"- Heat: {opportunity.heat_score:.1f}/10")
+        lines.append(f"- Observers: {', '.join(opportunity.observers)}")
+        lines.append(f"- Fingerprint: `{opportunity.fingerprint}`")
+        for reason in opportunity.reasons[:3]:
+            lines.append(f"- Why: {reason}")
+        lines.append("")
+    return lines
+
+
+def _top_three_consensus_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Today's Top 3", ""]
+    if not opportunities:
+        return lines + ["No consensus-backed Top 3 yet.", ""]
+    for index, opportunity in enumerate(opportunities, start=1):
+        listing = opportunity.primary_listing
+        lines.append(f"### {index}. {opportunity.title}")
+        lines.append(f"- Consensus: {opportunity.consensus_score:.1f}/100")
+        lines.append(f"- Heat: {opportunity.heat_score:.1f}/10")
+        lines.append(f"- Founder Score: {(listing.founder_score if listing else 0) or 0:.0f}/100")
+        lines.append(f"- Build Complexity: {(listing.build_complexity if listing else None) or 'n/a'}")
+        lines.append(f"- Revenue Timeline: {(listing.revenue_timeline if listing else None) or 'n/a'}")
+        lines.append(f"- Next Action: {_next_action_for_consensus(opportunity)}")
+        lines.append("- Why Top 3:")
+        for reason in opportunity.reasons:
+            lines.append(f"  - {reason}")
+        lines.append("")
+    return lines
+
+
+def _observer_agreement_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Observer Agreement", ""]
+    if not opportunities:
+        return lines + ["No observer agreement yet.", ""]
+    for opportunity in opportunities[:8]:
+        lines.append(f"### {opportunity.title}")
+        for observer in opportunity.observers:
+            lines.append(f"- [x] {observer}")
+        lines.append("")
+    return lines
+
+
+def _heat_rankings_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Heat Rankings", ""]
+    if not opportunities:
+        return lines + ["No heat rankings yet.", ""]
+    for opportunity in heat_rankings(opportunities)[:10]:
+        lines.append(f"### {opportunity.title}")
+        for observer, heat in opportunity.heat_by_observer.items():
+            lines.append(f"- {observer}: {_heat_bar(heat)} {heat:.1f}/10")
+        lines.append(f"- Overall: {opportunity.heat_score:.1f}/10")
+        lines.append("")
+    return lines
+
+
+def _portfolio_allocation_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Portfolio Allocation", ""]
+    allocation = portfolio_allocation(opportunities)
+    if not allocation:
+        return lines + ["No portfolio allocation available.", ""]
+    lines.append("| Market | Count | Consensus | Heat | Status | Recommendation |")
+    lines.append("| --- | ---: | ---: | ---: | --- | --- |")
+    for item in allocation:
+        lines.append(
+            f"| {item.market} | {item.count} | {item.average_consensus:.1f} | "
+            f"{item.average_heat:.1f} | {item.status} | {item.recommendation} |"
+        )
+    lines.append("")
+    return lines
+
+
+def _executive_recommendation_section(opportunities: list[ConsensusOpportunity]) -> list[str]:
+    lines = ["## Executive Recommendation", "", "If I were building today...", ""]
+    recommendation = executive_recommendation(opportunities)
+    lines.append(f"- {recommendation['build']}")
+    lines.append(f"- {recommendation['watch']}")
+    lines.append(f"- {recommendation['ignore']}")
+    lines.append("")
+    return lines
 
 
 def _top_three_section(listings: list[Listing], memory_records: list[OpportunityMemory]) -> list[str]:
@@ -118,6 +228,53 @@ def _top_three_section(listings: list[Listing], memory_records: list[Opportunity
         lines.append(f"- Portfolio Fit: {(listing.portfolio_fit or 0):.0f}/100")
         lines.append(f"- Trend: {trend.label if trend else 'NEW'}")
         lines.append(f"- Next action: {listing.executive_summary or 'Review opportunity detail.'}")
+        lines.append("")
+    return lines
+
+
+def _next_action_for_consensus(opportunity: ConsensusOpportunity) -> str:
+    listing = opportunity.primary_listing
+    if opportunity.consensus_score >= 82 and opportunity.heat_score >= 7.5:
+        return "Write a one-page validation memo and define the smallest MVP test."
+    if listing and listing.recommendation:
+        return f"Validate the {listing.recommendation} recommendation with one external data source."
+    return "Keep collecting independent observer evidence before acting."
+
+
+def _heat_bar(value: float) -> str:
+    filled = max(0, min(10, round(value)))
+    return "█" * filled + "░" * (10 - filled)
+
+
+def _github_intelligence_section(signals: list[Signal]) -> list[str]:
+    groups = [
+        ("Fast Growing Repos", {"github_fast_growth_candidate"}),
+        ("Abandoned Popular Repos", {"github_abandoned_popular_repo"}),
+        ("Commercial Potential", {"github_commercial_potential", "github_founder_profile_match"}),
+        ("AI/Automation Tools", {"github_ai_tool", "github_automation_tool", "github_developer_tool"}),
+        ("No Homepage Opportunities", {"github_no_homepage_opportunity"}),
+        ("High Issue Demand", {"github_high_issue_demand"}),
+    ]
+    lines = ["## GitHub Intelligence", ""]
+    for title, signal_types in groups:
+        matching = sorted(
+            [signal for signal in signals if signal.signal_type in signal_types],
+            key=lambda signal: signal.confidence,
+            reverse=True,
+        )
+        lines.extend([f"### {title}", ""])
+        if not matching:
+            lines.extend(["No signals.", ""])
+            continue
+        for signal in matching[:5]:
+            metadata = signal.metadata
+            lines.append(f"- **{signal.title}**")
+            lines.append(f"  - URL: {metadata.get('github_html_url') or metadata.get('html_url') or 'n/a'}")
+            lines.append(f"  - Stars: {metadata.get('stars', 0):,}")
+            lines.append(f"  - Forks: {metadata.get('forks', 0):,}")
+            lines.append(f"  - Language: {metadata.get('language') or 'Unknown'}")
+            lines.append(f"  - Reason: {metadata.get('github_reason') or signal.description}")
+            lines.append(f"  - Recommendation: {signal.recommendation}")
         lines.append("")
     return lines
 

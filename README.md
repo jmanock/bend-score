@@ -2,7 +2,7 @@
 
 Bend Score is a terminal-first opportunity intelligence platform for finding, evaluating, and planning digital acquisition or build opportunities.
 
-V6.5 adds Opportunity Memory on top of Founder Intelligence, the observer framework, marketplace intake, Bend Score scoring, reports, recommendations, watchlist workflow, SQLite timeline, and Morning Content Engine signal export. It now tracks whether opportunities are rising, falling, stable, volatile, or new, and lets Jon store feedback that lightly influences future Founder Scores.
+V7.5 adds Consensus Intelligence on top of Opportunity Memory, Founder Intelligence, the observer framework, marketplace intake, Bend Score scoring, reports, recommendations, watchlist workflow, SQLite timeline, Observer Pack foundation, GitHub intelligence, and Morning Content Engine signal export. Instead of treating every observer signal as isolated, Bend Score now merges related signals into consensus opportunities with heat, observer agreement, and portfolio allocation.
 
 Bend Score uses GitHub's public REST API for the GitHub Observer. It does not use paid APIs, OpenAI calls, marketplace scraping, cloud services, authentication, or a web dashboard.
 
@@ -44,12 +44,17 @@ Daily logs are stored in:
 ```bash
 python3 main.py run
 python3 main.py top
+python3 main.py top3
+python3 main.py consensus
+python3 main.py heat
 python3 main.py stats
 python3 main.py search saas
 python3 main.py watch 4
 python3 main.py watchlist
 python3 main.py note 4 "Check seller history and traffic quality"
 python3 main.py github
+python3 main.py observers
+python3 main.py observer github
 python3 main.py signals
 python3 main.py signals github
 python3 main.py import-csv examples/sample_listings.csv
@@ -65,7 +70,7 @@ python3 main.py signals-outbox
 ## Architecture
 
 ```text
-Observer -> Raw Facts -> Signal -> SQLite Timeline -> Founder Intelligence -> Opportunity Memory -> Morning Investment Memo
+Observer -> Raw Facts -> Signal -> SQLite Timeline -> Founder Intelligence -> Opportunity Memory -> Consensus Intelligence -> Morning Investment Memo
 ```
 
 ```text
@@ -75,6 +80,7 @@ bend_score/
   models/                Listing, watchlist, and standardized Signal models
   database/              SQLite repository, listings, watchlist, signals, signal history
   reports/               Markdown intelligence briefings and project blueprints
+  intelligence/          Consensus merging, heat scoring, top-three selection, allocation analysis
   intake/                CSV/manual listing validation and normalization
   utils/                 Confidence and config helpers
   scoring/               Bend Score and Founder Score engines
@@ -101,7 +107,7 @@ signals/
 
 ## Morning Content Engine Signal Export
 
-V6.5 can export high-value Bend Score opportunities as standardized signal JSON files for Morning Content Engine.
+V7.5 exports high-value Bend Score opportunities as standardized signal JSON files for Morning Content Engine, now with consensus metadata when available.
 
 Run:
 
@@ -115,6 +121,16 @@ Signals are written to:
 ```text
 signals/outbox/
 ```
+
+Consensus-backed exports include:
+
+- `consensus_score`
+- `heat_score`
+- `observer_count`
+- `observer_names`
+- `consensus_fingerprint`
+- `consensus_market`
+- `consensus_keywords`
 
 The exporter uses the Morning Content Engine Signal Contract:
 
@@ -412,23 +428,84 @@ Future observers can plug into the same architecture:
 
 A small observer should be possible in under 100 lines because it only needs to collect facts and normalize them into `Signal` objects.
 
+## Observer Pack 1.0
+
+Observer Pack 1.0 lives in `bend_score/observers/packs/`.
+
+Planned observers:
+
+- GitHub
+- Product Hunt
+- Hacker News
+- Reddit
+- Google Trends
+- WordPress Plugins
+- Chrome Extensions
+
+V7 implements GitHub improvements only. It uses the public GitHub REST API, supports optional `GITHUB_TOKEN`, and continues with public rate limits when no token is present.
+
+GitHub intelligence detects:
+
+- fast-growing repositories
+- abandoned popular repositories
+- repos with many issues
+- AI, automation, and developer tooling projects
+- projects with no website/homepage
+- commercial potential
+- founder-profile matches
+
+Strong GitHub signals are converted into normal Bend Score opportunities. They receive Bend Score, Founder Score, Portfolio Fit, Build Complexity, maintenance estimates, recommendations, memory, blueprints, and Morning Content signal export metadata.
+
+Editable GitHub query families live in `config/observers.yaml`, including AI tools, automation tools, developer tools, abandoned popular repos, business tools, marketing tools, Chrome extensions, and no-homepage tools.
+
+## Consensus Intelligence
+
+Consensus Intelligence lives in `bend_score/intelligence/consensus.py`.
+
+It builds deterministic opportunity fingerprints from:
+
+- title similarity
+- normalized keywords
+- tags and topics
+- category
+- source
+- language
+
+No embeddings or paid APIs are required. The goal is simple, repeatable matching across observers. When GitHub, future Google Trends, Reddit, Product Hunt, or other observers point at the same market or problem, Bend Score groups them into a single consensus opportunity.
+
+Consensus opportunities receive:
+
+- Consensus Score, based on observer count, Founder Score, Bend Score, trend, Portfolio Fit, recommendation agreement, and confidence
+- Heat Score, based on independent observer agreement around the same market, keyword, category, or problem
+- observer agreement details
+- portfolio allocation recommendations by market
+- Top 3 reasoning that favors consensus and heat, not only raw score
+- executive recommendation: Build, Watch, Ignore
+
+CLI commands:
+
+```bash
+python3 main.py consensus
+python3 main.py top3
+python3 main.py heat
+```
+
 ## Intelligence Reports
 
 `reports/latest.md` is now a daily intelligence briefing with:
 
-- High Confidence Signals
-- observer recommendation groups
-- Signal Summary
-- Statistics
-- Marketplace Opportunity Memos
+- Consensus Opportunities
+- Today's Top 3
+- Observer Agreement
+- Heat Rankings
+- Portfolio Allocation
+- Executive Recommendation
 - Founder Score
 - Portfolio Fit
 - Build Complexity
 - Maintenance
 - Revenue Timeline
 - Executive Summary
-- Observer Summary
-- Recommendations
 - GitHub Intelligence, when GitHub is enabled
 
 ## Founder Intelligence

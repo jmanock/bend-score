@@ -7,7 +7,9 @@ from datetime import date
 from pathlib import Path
 
 from bend_score.exporters.morning_content import export_opportunities, should_export, signal_for_listing
+from bend_score.intake.github_opportunities import github_signal_to_listing
 from bend_score.models import Listing, utc_now
+from bend_score.observers.github import generate_github_signals
 from bend_score.recommendations import apply_recommendation
 
 
@@ -70,6 +72,19 @@ class MorningContentExporterTest(unittest.TestCase):
         self.assertIn("category", metadata)
         self.assertIn("score_breakdown", metadata)
 
+    def test_github_metadata_is_exported(self) -> None:
+        github_listing = github_signal_to_listing(generate_github_signals(_github_repo())[0])
+        github_listing.id = 123
+        github_listing = apply_recommendation(github_listing)
+
+        signal = signal_for_listing(github_listing)
+        metadata = signal["metadata"]
+
+        self.assertEqual(metadata["repo_url"], "https://github.com/octo/agent-tool")
+        self.assertEqual(metadata["stars"], 2200)
+        self.assertEqual(metadata["language"], "Python")
+        self.assertIn("reason", metadata)
+
 
 def _listing(
     id: int | None = 1,
@@ -98,6 +113,29 @@ def _listing(
     )
 
 
+def _github_repo() -> dict:
+    return {
+        "repo_name": "agent-tool",
+        "full_name": "octo/agent-tool",
+        "html_url": "https://github.com/octo/agent-tool",
+        "description": "AI agent automation workflow tool",
+        "language": "Python",
+        "stars": 2200,
+        "forks": 240,
+        "open_issues": 84,
+        "watchers": 2200,
+        "created_at": "2023-01-01T00:00:00Z",
+        "updated_at": "2026-06-01T00:00:00Z",
+        "pushed_at": "2026-06-01T00:00:00Z",
+        "license": "MIT",
+        "topics": ["ai", "agent", "automation"],
+        "owner": "octo",
+        "archived": False,
+        "homepage": "",
+        "default_branch": "main",
+        "query": "AI stars:>1000",
+    }
+
+
 if __name__ == "__main__":
     unittest.main()
-

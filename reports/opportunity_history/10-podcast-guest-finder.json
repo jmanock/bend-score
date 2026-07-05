@@ -8,21 +8,33 @@
   "founder_score_change": 0.0,
   "historical_bend_scores": [
     73.6,
+    73.6,
+    73.6,
+    73.6,
+    73.6,
     73.6
   ],
   "historical_founder_scores": [
     64.6,
+    64.6,
+    64.6,
+    64.6,
+    64.6,
     64.6
   ],
-  "last_seen": "2026-07-05T13:22:46+00:00",
+  "last_seen": "2026-07-05T14:29:33+00:00",
   "notes": "",
   "recommendation_change": "No change",
   "recommendation_history": [
     "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
     "\u2605\u2605\u2606\u2606\u2606 RESEARCH"
   ],
   "source": "Sample",
-  "times_seen": 2,
+  "times_seen": 6,
   "title": "Podcast Guest Finder",
   "trend": "STABLE"
 }

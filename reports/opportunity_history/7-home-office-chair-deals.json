@@ -8,21 +8,33 @@
   "founder_score_change": 0.0,
   "historical_bend_scores": [
     80.9,
+    80.9,
+    80.9,
+    80.9,
+    80.9,
     80.9
   ],
   "historical_founder_scores": [
     77.7,
+    77.7,
+    77.7,
+    77.7,
+    77.7,
     77.7
   ],
-  "last_seen": "2026-07-05T13:22:46+00:00",
+  "last_seen": "2026-07-05T14:29:33+00:00",
   "notes": "",
   "recommendation_change": "No change",
   "recommendation_history": [
     "\u2605\u2605\u2605\u2605\u2606 ACQUIRE",
+    "\u2605\u2605\u2605\u2605\u2606 ACQUIRE",
+    "\u2605\u2605\u2605\u2605\u2606 ACQUIRE",
+    "\u2605\u2605\u2605\u2605\u2606 ACQUIRE",
+    "\u2605\u2605\u2605\u2605\u2606 ACQUIRE",
     "\u2605\u2605\u2605\u2605\u2606 ACQUIRE"
   ],
   "source": "Sample",
-  "times_seen": 2,
+  "times_seen": 6,
   "title": "Home Office Chair Deals",
   "trend": "STABLE"
 }

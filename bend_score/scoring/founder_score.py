@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from bend_score.intake.github_opportunities import github_metadata_from_listing
 from bend_score.models import Listing
 from bend_score.scoring.common import combined_text
 
@@ -80,6 +81,8 @@ def calculate_founder_score(listing: Listing) -> FounderScoreResult:
         "ease_of_mvp": _ease_of_mvp(listing),
         "long_term_defensibility": _long_term_defensibility(listing),
     }
+    if _is_github_listing(listing):
+        factor_scores = _apply_github_factor_scores(listing, factor_scores)
     total_weight = sum(FACTOR_WEIGHTS.values())
     total = round(
         sum(score * FACTOR_WEIGHTS[name] for name, (score, _reason) in factor_scores.items()) / total_weight,
@@ -437,6 +440,76 @@ def _long_term_defensibility(listing: Listing) -> tuple[int, str]:
     if listing.traffic_estimate >= 10000:
         return 70, "Search footprint can become a durable acquisition channel."
     return 45, "Defensibility needs to be built from scratch."
+
+
+def _is_github_listing(listing: Listing) -> bool:
+    return listing.source == "GitHub" or bool(github_metadata_from_listing(listing))
+
+
+def _apply_github_factor_scores(
+    listing: Listing,
+    factor_scores: dict[str, tuple[int, str]],
+) -> dict[str, tuple[int, str]]:
+    metadata = github_metadata_from_listing(listing)
+    stars = int(metadata.get("stars") or listing.traffic_estimate or 0)
+    forks = int(metadata.get("forks") or 0)
+    issues = int(metadata.get("open_issues") or 0)
+    homepage_missing = not bool(metadata.get("homepage"))
+    license_value = str(metadata.get("license") or "").upper()
+    topics = " ".join(str(topic) for topic in metadata.get("topics", []))
+    text = f"{combined_text(listing)} {topics}".lower()
+
+    overrides = dict(factor_scores)
+    overrides["automation_potential"] = _max_factor(
+        overrides["automation_potential"],
+        90 if _has_any(text, ["automation", "workflow", "agent", "bot", "scheduler"]) else 68,
+        "GitHub repo exposes automation or workflow pain that could become a productized tool.",
+    )
+    overrides["api_availability"] = _max_factor(
+        overrides["api_availability"],
+        92 if _has_any(text, ["api", "sdk", "library", "framework", "integration", "tool"]) else 68,
+        "Repository shape suggests API, SDK, or integration leverage.",
+    )
+    overrides["seo_scalability"] = _max_factor(
+        overrides["seo_scalability"],
+        84 if _has_any(text, ["docs", "templates", "examples", "awesome", "directory", "starter"]) else 66,
+        "GitHub demand can support docs, examples, alternatives, and comparison content.",
+    )
+    overrides["content_generation_potential"] = _max_factor(
+        overrides["content_generation_potential"],
+        90 if stars >= 1000 or issues >= 50 else 70,
+        "Stars and issue demand provide recurring content angles and user pain points.",
+    )
+    overrides["low_maintenance_effort"] = _max_factor(
+        overrides["low_maintenance_effort"],
+        78 if homepage_missing else 62,
+        "A homepage/docs wrapper can start lighter than maintaining a forked core project.",
+    )
+    overrides["recurring_revenue_potential"] = _max_factor(
+        overrides["recurring_revenue_potential"],
+        82 if _has_any(text, ["developer", "api", "workflow", "automation", "testing", "agent"]) else 62,
+        "Developer workflow pain can support hosted, support, template, or monitoring revenue.",
+    )
+    overrides["saas_or_mobile_expansion"] = _max_factor(
+        overrides["saas_or_mobile_expansion"],
+        94 if _has_any(text, ["api", "automation", "workflow", "monitoring", "agent", "tool"]) else 70,
+        "Repo can plausibly evolve into a hosted SaaS wrapper or workflow product.",
+    )
+    overrides["ease_of_mvp"] = _max_factor(
+        overrides["ease_of_mvp"],
+        82 if homepage_missing or "MIT" in license_value or "APACHE" in license_value else 62,
+        "MVP can begin as hosted docs, templates, landing page, or integration wrapper.",
+    )
+    overrides["long_term_defensibility"] = _max_factor(
+        overrides["long_term_defensibility"],
+        82 if stars >= 1000 and forks >= 100 else 66,
+        "Open-source adoption can compound into audience, integrations, and product credibility.",
+    )
+    return overrides
+
+
+def _max_factor(current: tuple[int, str], score: int, reason: str) -> tuple[int, str]:
+    return (score, reason) if score > current[0] else current
 
 
 def _has_any(text: str, needles: list[str]) -> bool:

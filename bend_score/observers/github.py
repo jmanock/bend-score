@@ -149,6 +149,8 @@ def generate_github_signals(repo: dict[str, Any]) -> list[Signal]:
         signals.append(_issue_demand_signal(repo))
     if _is_no_homepage_opportunity(repo):
         signals.append(_no_homepage_signal(repo))
+    if _matches_founder_profile(repo):
+        signals.append(_founder_profile_signal(repo))
 
     if not signals:
         signals.append(_signal(repo, "github_low_quality_repo", "Repo does not show a strong opportunity signal yet.", 42, "low", "IGNORE"))
@@ -291,6 +293,18 @@ def _no_homepage_signal(repo: dict[str, Any]) -> Signal:
     )
 
 
+def _founder_profile_signal(repo: dict[str, Any]) -> Signal:
+    score = github_founder_fit_score(repo)
+    return _signal(
+        repo,
+        "github_founder_profile_match",
+        "Repo matches founder profile: automation, developer tooling, AI, API, SEO/content, or lightweight SaaS wrapper potential.",
+        score,
+        "high" if score >= 82 else "medium",
+        "BUILD" if score >= 84 else "RESEARCH",
+    )
+
+
 def _signal(repo: dict[str, Any], signal_type: str, description: str, confidence: int, impact: str, recommendation: str) -> Signal:
     metadata = dict(repo)
     metadata.update(
@@ -299,6 +313,8 @@ def _signal(repo: dict[str, Any], signal_type: str, description: str, confidence
             "github_html_url": repo.get("html_url"),
             "github_signal_type": signal_type,
             "recommendation_explanation": description,
+            "github_founder_score": github_founder_fit_score(repo),
+            "github_reason": github_reason(repo),
         }
     )
     return Signal.create(
@@ -344,6 +360,56 @@ def _is_high_issue_demand(repo: dict[str, Any]) -> bool:
 
 def _is_no_homepage_opportunity(repo: dict[str, Any]) -> bool:
     return _stars(repo) > 500 and not repo.get("homepage")
+
+
+def _matches_founder_profile(repo: dict[str, Any]) -> bool:
+    return github_founder_fit_score(repo) >= 72
+
+
+def github_founder_fit_score(repo: dict[str, Any]) -> int:
+    score = 35
+    if _stars(repo) >= 1000:
+        score += 12
+    if _forks(repo) >= 100:
+        score += 6
+    if _open_issues(repo) >= 50:
+        score += 8
+    if _pushed_within_days(repo, 180):
+        score += 8
+    elif _is_abandoned_popular(repo):
+        score += 6
+    if _license_is_permissive(repo):
+        score += 7
+    if not repo.get("homepage") and _stars(repo) >= 500:
+        score += 7
+    if _is_ai_tool(repo) or _is_automation_tool(repo):
+        score += 8
+    if _is_developer_tool(repo):
+        score += 7
+    if _contains(repo, ["api", "sdk", "library", "framework", "integration"]):
+        score += 5
+    if _contains(repo, ["docs", "templates", "examples", "awesome", "directory", "starter"]):
+        score += 4
+    return max(0, min(100, score))
+
+
+def github_reason(repo: dict[str, Any]) -> str:
+    reasons = []
+    if _stars(repo) >= 1000:
+        reasons.append(f"{_stars(repo):,} stars")
+    if _open_issues(repo) >= 50:
+        reasons.append(f"{_open_issues(repo):,} open issues")
+    if not repo.get("homepage"):
+        reasons.append("no homepage")
+    if _license_is_permissive(repo):
+        reasons.append("permissive license")
+    if _is_ai_tool(repo):
+        reasons.append("AI/tooling angle")
+    if _is_automation_tool(repo):
+        reasons.append("automation angle")
+    if _is_developer_tool(repo):
+        reasons.append("developer workflow")
+    return "; ".join(reasons) or "general GitHub opportunity signal"
 
 
 def _contains(repo: dict[str, Any], needles: list[str]) -> bool:

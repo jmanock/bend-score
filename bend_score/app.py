@@ -10,7 +10,15 @@ from bend_score.config import SEED_COUNT
 from bend_score.core.intelligence import run_observers
 from bend_score.database.repository import ListingRepository
 from bend_score.exporters.morning_content import SIGNAL_OUTBOX, export_opportunities
+from bend_score.intake.github_opportunities import github_signals_to_listings
 from bend_score.intake.listings import ImportResult, listing_from_mapping, load_csv_rows
+from bend_score.intelligence.consensus import (
+    build_consensus,
+    executive_recommendation,
+    heat_rankings,
+    portfolio_allocation,
+    top_three_consensus,
+)
 from bend_score.logging_utils import configure_logging
 from bend_score.memory import (
     build_roadmap,
@@ -46,14 +54,17 @@ def run() -> None:
             print(f"{ui.GREEN}✓{ui.RESET} {result.label}")
 
         inserted_signals = repository.insert_signals(intelligence.signals)
+        converted = add_github_opportunities(repository, intelligence.signals)
         logger.info("signals generated count=%s", len(intelligence.signals))
         logger.info("timeline updated count=%s", len(inserted_signals))
+        logger.info("github opportunities converted count=%s", len(converted))
 
         listings = refresh_scores(repository, logger)
         memory_records = repository.record_opportunity_memory(listings)
         feedback_entries = repository.list_feedback()
         write_opportunity_history_exports(memory_records)
         ranked = sorted(listings, key=lambda item: item.bend_score or 0, reverse=True)
+        consensus_opportunities = build_consensus(ranked, intelligence.signals, memory_records)
         print("Writing report...")
         blueprint_paths = write_project_blueprints(ranked)
         latest_path, dated_path = write_intelligence_reports(
@@ -76,6 +87,7 @@ def run() -> None:
         print(f"{ui.GREEN}✓{ui.RESET} Observer loaded")
         print(f"{ui.GREEN}✓{ui.RESET} Signals generated: {len(intelligence.signals)}")
         print(f"{ui.GREEN}✓{ui.RESET} Timeline updated: {len(inserted_signals)} new snapshots")
+        print(f"{ui.GREEN}✓{ui.RESET} GitHub opportunities converted: {len(converted)}")
         print(f"{ui.GREEN}✓{ui.RESET} Confidence calculated: {intelligence.average_confidence:.1f}% average")
         print(f"{ui.GREEN}✓{ui.RESET} Intelligence report generated")
 
@@ -89,7 +101,7 @@ def run() -> None:
         print(f"Highest Confidence: {intelligence.highest_confidence}%")
 
         ui.section("Top Opportunities")
-        ui.print_listings(ranked, limit=10)
+        print_consensus(top_three_consensus(consensus_opportunities), limit=3)
 
         ui.section("Watchlist Summary")
         ui.print_watchlist(repository.list_watchlist())
@@ -122,10 +134,58 @@ def refresh_scores(repository: ListingRepository, logger: logging.Logger | None 
     return repository.list_all()
 
 
+def add_github_opportunities(repository: ListingRepository, signals) -> list:
+    converted = []
+    for listing in github_signals_to_listings(signals):
+        if repository.is_duplicate_listing(listing):
+            continue
+        converted.append(repository.add_listing(listing))
+    return converted
+
+
 def top(limit: int = 10) -> None:
     repository = _ready_repository()
     ui.header("Top Opportunities")
     ui.print_listings(repository.top(limit), limit=limit)
+
+
+def consensus() -> None:
+    repository = _ready_repository()
+    opportunities = build_consensus(
+        repository.list_all(),
+        repository.list_signals(limit=500),
+        repository.list_opportunity_memory(),
+    )
+    ui.header("Consensus Intelligence")
+    print_consensus(opportunities, limit=10)
+    ui.section("Portfolio Allocation")
+    for item in portfolio_allocation(opportunities):
+        print(f"{item.market}: {item.status} ({item.count} opportunities, heat {item.average_heat:.1f}/10)")
+        print(f"  Recommendation: {item.recommendation}")
+    ui.section("Executive Recommendation")
+    for line in executive_recommendation(opportunities).values():
+        print(f"- {line}")
+
+
+def top3() -> None:
+    repository = _ready_repository()
+    opportunities = top_three_consensus(
+        build_consensus(repository.list_all(), repository.list_signals(limit=500), repository.list_opportunity_memory())
+    )
+    ui.header("Today's Top 3")
+    print_consensus(opportunities, limit=3)
+
+
+def heat() -> None:
+    repository = _ready_repository()
+    opportunities = heat_rankings(
+        build_consensus(repository.list_all(), repository.list_signals(limit=500), repository.list_opportunity_memory())
+    )
+    ui.header("Heat Rankings")
+    for opportunity in opportunities[:10]:
+        print(f"{opportunity.heat_score:.1f}/10  {opportunity.title}")
+        for observer, score in opportunity.heat_by_observer.items():
+            print(f"  {observer}: {score:.1f}/10")
 
 
 def search(query: str) -> None:
@@ -193,6 +253,9 @@ def github() -> None:
     print("Running GitHub Observer...")
     result = observer.run()
     inserted = repository.insert_signals(result.signals)
+    converted = add_github_opportunities(repository, result.signals)
+    if converted:
+        refresh_scores(repository)
     logger.info("GitHub observer runtime %.3fs", result.runtime_seconds)
     logger.info("GitHub signals generated count=%s inserted=%s", len(result.signals), len(inserted))
 
@@ -200,6 +263,7 @@ def github() -> None:
     print(f"Collected repositories: {result.raw_count}")
     print(f"Generated signals: {len(result.signals)}")
     print(f"Stored new signals: {len(inserted)}")
+    print(f"Converted opportunities: {len(converted)}")
     print(f"Runtime: {result.runtime_seconds:.3f}s")
     if not observer.token:
         print("Warning: GITHUB_TOKEN is not set, so GitHub API rate limits are lower.")
@@ -210,6 +274,32 @@ def github() -> None:
     ui.section("Recent GitHub Signals")
     preview = inserted[:25] if inserted else repository.list_signals(limit=25, observer="github")
     ui.print_signals(preview)
+
+
+def observers() -> None:
+    ui.header("Observers")
+    enabled = {observer.name for observer in ObserverRegistry.enabled()}
+    for name, observer_cls in sorted(ObserverRegistry.all().items()):
+        state = "enabled" if name in enabled else "disabled"
+        print(f"{name}: {observer_cls.label} ({state})")
+
+
+def observer(name: str) -> None:
+    if name == "github":
+        github()
+        return
+    observers_map = ObserverRegistry.all()
+    if name not in observers_map:
+        print(f"Observer not found: {name}")
+        return
+    instance = observers_map[name]()
+    print(f"Running {instance.label}...")
+    result = instance.run()
+    repository = _ready_repository()
+    inserted = repository.insert_signals(result.signals)
+    print(f"Collected: {result.raw_count}")
+    print(f"Generated signals: {len(result.signals)}")
+    print(f"Stored new signals: {len(inserted)}")
 
 
 def signals(observer: str | None = None) -> None:
@@ -357,7 +447,28 @@ def opportunity_detail(listing_id: int) -> None:
 def export_signals() -> None:
     repository = _ready_repository()
     listings = repository.list_all()
-    summary = export_opportunities(listings, memory_records=repository.list_opportunity_memory())
+    memory_records = repository.list_opportunity_memory()
+    consensus_metadata = {
+        listing_id: metadata
+        for opportunity in build_consensus(listings, repository.list_signals(limit=500), memory_records)
+        for listing_id, metadata in [
+            (
+                listing.id,
+                {
+                    "consensus_score": round(opportunity.consensus_score, 1),
+                    "heat_score": round(opportunity.heat_score, 1),
+                    "observer_count": opportunity.observer_count,
+                    "observer_names": opportunity.observers,
+                    "consensus_fingerprint": opportunity.fingerprint,
+                    "consensus_market": opportunity.market,
+                    "consensus_keywords": opportunity.keywords,
+                },
+            )
+            for listing in opportunity.listings
+            if listing.id is not None
+        ]
+    }
+    summary = export_opportunities(listings, memory_records=memory_records, consensus_metadata=consensus_metadata)
     ui.header("Morning Content Signal Export")
     for line in summary.lines():
         print(line)
@@ -381,6 +492,25 @@ def _ready_repository() -> ListingRepository:
         repository.add_many(sample_listings()[:SEED_COUNT])
     refresh_scores(repository)
     return repository
+
+
+def print_consensus(opportunities, limit: int = 10) -> None:
+    if not opportunities:
+        print("No consensus opportunities yet.")
+        return
+    for index, opportunity in enumerate(opportunities[:limit], start=1):
+        listing = opportunity.primary_listing
+        print(
+            f"{index}. {opportunity.title} | Consensus {opportunity.consensus_score:.1f}/100 | "
+            f"Heat {opportunity.heat_score:.1f}/10 | Observers {', '.join(opportunity.observers)}"
+        )
+        if listing:
+            print(
+                f"   Founder {(listing.founder_score or 0):.1f} | Bend {(listing.bend_score or 0):.1f} | "
+                f"{listing.build_complexity or 'n/a'} | Revenue {listing.revenue_timeline or 'n/a'}"
+            )
+        for reason in opportunity.reasons[:2]:
+            print(f"   - {reason}")
 
 
 def _slug(value: str) -> str:

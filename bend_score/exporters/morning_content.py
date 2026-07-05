@@ -7,6 +7,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from bend_score.intake.github_opportunities import github_metadata_from_listing
+from bend_score.intelligence.consensus import consensus_metadata_by_listing
 from bend_score.memory import OpportunityMemory, trend_for_memory
 from bend_score.models import Listing
 from bend_score.scoring.bend_score import BendScoreResult, calculate_bend_score
@@ -41,6 +43,7 @@ def export_opportunities(
     outbox_dir: Path | str = SIGNAL_OUTBOX,
     export_date: date | None = None,
     memory_records: list[OpportunityMemory] | None = None,
+    consensus_metadata: dict[int, dict[str, object]] | None = None,
 ) -> SignalExportSummary:
     outbox = Path(outbox_dir)
     outbox.mkdir(parents=True, exist_ok=True)
@@ -50,6 +53,7 @@ def export_opportunities(
     skipped = 0
     duplicates = 0
     memory_by_id = {memory.listing_id: memory for memory in (memory_records or [])}
+    consensus_by_id = consensus_metadata or consensus_metadata_by_listing(listings, [], memory_records)
 
     for listing in listings:
         score_result = calculate_bend_score(listing)
@@ -64,7 +68,14 @@ def export_opportunities(
             duplicates += 1
             continue
 
-        signal = signal_for_listing(listing, score_result, confidence, current_date, memory_by_id.get(listing.id))
+        signal = signal_for_listing(
+            listing,
+            score_result,
+            confidence,
+            current_date,
+            memory_by_id.get(listing.id),
+            consensus_by_id.get(listing.id or -1),
+        )
         path.write_text(json.dumps(signal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         exported_files.append(path)
 
@@ -95,6 +106,7 @@ def signal_for_listing(
     confidence: int | None = None,
     export_date: date | None = None,
     memory: OpportunityMemory | None = None,
+    consensus_metadata: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     score_result = score_result or calculate_bend_score(listing)
     confidence = confidence if confidence is not None else confidence_for(score_result)
@@ -102,7 +114,8 @@ def signal_for_listing(
     bend_score = listing.bend_score if listing.bend_score is not None else score_result.total
     trend = trend_for_memory(memory) if memory else None
 
-    return {
+    github_metadata = github_metadata_from_listing(listing)
+    signal = {
         "source_project": "bend-score",
         "source_type": "opportunity",
         "brand": "Bend Score",
@@ -142,6 +155,22 @@ def signal_for_listing(
             "export_date": (export_date or date.today()).isoformat(),
         },
     }
+    if github_metadata:
+        signal["metadata"].update(
+            {
+                "repo_url": github_metadata.get("github_html_url") or github_metadata.get("html_url"),
+                "stars": github_metadata.get("stars"),
+                "forks": github_metadata.get("forks"),
+                "language": github_metadata.get("language"),
+                "license": github_metadata.get("license"),
+                "topics": github_metadata.get("topics"),
+                "reason": github_metadata.get("github_reason") or github_metadata.get("recommendation_explanation"),
+                "github_founder_score": github_metadata.get("github_founder_score"),
+            }
+        )
+    if consensus_metadata:
+        signal["metadata"].update(consensus_metadata)
+    return signal
 
 
 def confidence_for(score_result: BendScoreResult) -> int:
@@ -190,8 +219,10 @@ def _recommendation_for(listing: Listing, score_result: BendScoreResult) -> str:
 
 
 def _summary_for(listing: Listing, bend_score: float, recommendation: str) -> str:
+    category = listing.category or "business"
+    descriptor = category if "opportunity" in category.lower() else f"{category} opportunity"
     return (
-        f"Bend Score found a {bend_score:.0f}/100 {listing.category} opportunity "
+        f"Bend Score found a {bend_score:.0f}/100 {descriptor} "
         f"with a {recommendation or 'RESEARCH'} recommendation worth reviewing."
     )
 

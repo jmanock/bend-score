@@ -11,9 +11,13 @@ def main() -> None:
 
     subparsers.add_parser("run", help="Generate today's acquisition intelligence report.")
     subparsers.add_parser("top", help="Show the highest scoring businesses.")
+    subparsers.add_parser("top3", help="Show today's top three consensus-backed opportunities.")
+    subparsers.add_parser("consensus", help="Show merged consensus opportunities.")
+    subparsers.add_parser("heat", help="Show opportunity heat rankings.")
     subparsers.add_parser("stats", help="Show portfolio analytics.")
     subparsers.add_parser("watchlist", help="Show watchlist items.")
     subparsers.add_parser("github", help="Run only the GitHub observer.")
+    subparsers.add_parser("observers", help="List observer packs and enabled observers.")
     subparsers.add_parser("add-listing", help="Manually add a listing through terminal prompts.")
     subparsers.add_parser("listings", help="Show recent listings.")
     subparsers.add_parser("export-signals", help="Export high-value opportunities to signals/outbox.")
@@ -27,6 +31,9 @@ def main() -> None:
 
     signals_parser = subparsers.add_parser("signals", help="Show recent signals.")
     signals_parser.add_argument("observer", nargs="?")
+
+    observer_parser = subparsers.add_parser("observer", help="Run one observer by name.")
+    observer_parser.add_argument("name")
 
     search_parser = subparsers.add_parser("search", help="Search listings by keyword.")
     search_parser.add_argument("query")
@@ -52,6 +59,12 @@ def main() -> None:
         app.run()
     elif args.command == "top":
         app.top()
+    elif args.command == "top3":
+        app.top3()
+    elif args.command == "consensus":
+        app.consensus()
+    elif args.command == "heat":
+        app.heat()
     elif args.command == "stats":
         app.stats()
     elif args.command == "search":
@@ -68,6 +81,10 @@ def main() -> None:
         app.opportunity_detail(args.opportunity_id)
     elif args.command == "github":
         app.github()
+    elif args.command == "observers":
+        app.observers()
+    elif args.command == "observer":
+        app.observer(args.name)
     elif args.command == "signals":
         app.signals(args.observer)
     elif args.command == "import-csv":

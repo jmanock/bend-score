@@ -6,19 +6,28 @@ github:
   queries:
     developer_tools:
       enabled: true
-      query: "stars:>500 language:Python pushed:>2025-01-01"
+      query: "developer tool stars:>500 pushed:>2025-01-01"
     ai_tools:
       enabled: true
-      query: "AI stars:>1000 pushed:>2025-01-01"
-    automation:
+      query: "AI LLM agent stars:>1000 pushed:>2025-01-01"
+    automation_tools:
       enabled: true
-      query: "automation stars:>300 pushed:>2025-01-01"
+      query: "automation workflow tool stars:>300 pushed:>2025-01-01"
     abandoned_popular:
       enabled: true
       query: "stars:>1000 pushed:<2024-01-01"
+    business_tools:
+      enabled: true
+      query: "crm invoicing analytics dashboard stars:>300 pushed:>2024-01-01"
+    marketing_tools:
+      enabled: true
+      query: "marketing seo email analytics stars:>300 pushed:>2024-01-01"
     chrome_extensions:
       enabled: true
       query: "chrome extension stars:>200"
+    no_homepage_tools:
+      enabled: true
+      query: "tool stars:>500 pushed:>2024-01-01"
 
 reddit:
   enabled: false
