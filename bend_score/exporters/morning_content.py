@@ -7,13 +7,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+from bend_score.memory import OpportunityMemory, trend_for_memory
 from bend_score.models import Listing
 from bend_score.scoring.bend_score import BendScoreResult, calculate_bend_score
 
 
 SIGNAL_OUTBOX = Path("signals/outbox")
-ALLOWED_RECOMMENDATIONS = {"BUY", "BUILD", "WATCH", "RESEARCH"}
-BLOCKED_RECOMMENDATIONS = {"IGNORE", "PASS"}
+ALLOWED_RECOMMENDATION_TERMS = {"BUILD NOW", "ACQUIRE", "BUILD LATER", "WATCH", "RESEARCH", "BUY", "BUILD"}
+BLOCKED_RECOMMENDATION_TERMS = {"IGNORE", "PASS"}
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,7 @@ def export_opportunities(
     listings: list[Listing],
     outbox_dir: Path | str = SIGNAL_OUTBOX,
     export_date: date | None = None,
+    memory_records: list[OpportunityMemory] | None = None,
 ) -> SignalExportSummary:
     outbox = Path(outbox_dir)
     outbox.mkdir(parents=True, exist_ok=True)
@@ -47,6 +49,7 @@ def export_opportunities(
     exported_files: list[Path] = []
     skipped = 0
     duplicates = 0
+    memory_by_id = {memory.listing_id: memory for memory in (memory_records or [])}
 
     for listing in listings:
         score_result = calculate_bend_score(listing)
@@ -61,7 +64,7 @@ def export_opportunities(
             duplicates += 1
             continue
 
-        signal = signal_for_listing(listing, score_result, confidence, current_date)
+        signal = signal_for_listing(listing, score_result, confidence, current_date, memory_by_id.get(listing.id))
         path.write_text(json.dumps(signal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         exported_files.append(path)
 
@@ -79,11 +82,11 @@ def should_export(listing: Listing, score_result: BendScoreResult | None = None,
         return False
     score_result = score_result or calculate_bend_score(listing)
     recommendation = _recommendation_for(listing, score_result)
-    if recommendation in BLOCKED_RECOMMENDATIONS:
+    if _contains_any(recommendation, BLOCKED_RECOMMENDATION_TERMS):
         return False
     confidence = confidence if confidence is not None else confidence_for(score_result)
     bend_score = listing.bend_score if listing.bend_score is not None else score_result.total
-    return bend_score >= 70 or recommendation in ALLOWED_RECOMMENDATIONS or confidence >= 80
+    return bend_score >= 70 or _contains_any(recommendation, ALLOWED_RECOMMENDATION_TERMS) or confidence >= 80
 
 
 def signal_for_listing(
@@ -91,11 +94,13 @@ def signal_for_listing(
     score_result: BendScoreResult | None = None,
     confidence: int | None = None,
     export_date: date | None = None,
+    memory: OpportunityMemory | None = None,
 ) -> dict[str, Any]:
     score_result = score_result or calculate_bend_score(listing)
     confidence = confidence if confidence is not None else confidence_for(score_result)
     recommendation = _recommendation_for(listing, score_result)
     bend_score = listing.bend_score if listing.bend_score is not None else score_result.total
+    trend = trend_for_memory(memory) if memory else None
 
     return {
         "source_project": "bend-score",
@@ -115,7 +120,18 @@ def signal_for_listing(
         "metadata": {
             "original_listing_id": listing.id,
             "bend_score": bend_score,
+            "founder_score": listing.founder_score,
+            "portfolio_fit": listing.portfolio_fit,
+            "trend": trend.label if trend else "NEW",
+            "bend_score_change": trend.bend_score_change if trend else 0,
+            "founder_score_change": trend.founder_score_change if trend else 0,
+            "recommendation_change": trend.recommendation_change if trend else "No prior recommendation",
+            "times_seen": trend.times_seen if trend else 0,
             "recommendation": recommendation,
+            "build_complexity": listing.build_complexity,
+            "maintenance_estimate": listing.maintenance_estimate,
+            "revenue_timeline": listing.revenue_timeline,
+            "executive_summary": listing.executive_summary,
             "asking_price": listing.asking_price,
             "monthly_revenue": listing.monthly_revenue,
             "monthly_profit": listing.monthly_profit,
@@ -138,11 +154,11 @@ def confidence_for(score_result: BendScoreResult) -> int:
 
 
 def priority_for(bend_score: float, recommendation: str, confidence: int) -> int:
-    if recommendation == "BUY" or bend_score >= 85:
+    if "BUILD NOW" in recommendation or "ACQUIRE" in recommendation or bend_score >= 85:
         return 9
-    if recommendation in {"BUILD", "RESEARCH"} or bend_score >= 75:
+    if "BUILD LATER" in recommendation or "RESEARCH" in recommendation or bend_score >= 75:
         return 8
-    if recommendation == "WATCH" or confidence >= 80:
+    if "WATCH" in recommendation or confidence >= 80:
         return 7
     return 6
 
@@ -178,6 +194,11 @@ def _summary_for(listing: Listing, bend_score: float, recommendation: str) -> st
         f"Bend Score found a {bend_score:.0f}/100 {listing.category} opportunity "
         f"with a {recommendation or 'RESEARCH'} recommendation worth reviewing."
     )
+
+
+def _contains_any(value: str, terms: set[str]) -> bool:
+    normalized = value.upper()
+    return any(term in normalized for term in terms)
 
 
 def _slug(value: str) -> str:

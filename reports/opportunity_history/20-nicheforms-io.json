@@ -1,0 +1,28 @@
+{
+  "bend_score_change": 0.0,
+  "category": "Domain",
+  "current_bend_score": 55.1,
+  "current_founder_score": 70.3,
+  "current_recommendation": "\u2605\u2605\u2605\u2606\u2606 WATCH",
+  "first_seen": "2026-07-04T17:23:36+00:00",
+  "founder_score_change": 0.0,
+  "historical_bend_scores": [
+    55.1,
+    55.1
+  ],
+  "historical_founder_scores": [
+    70.3,
+    70.3
+  ],
+  "last_seen": "2026-07-05T13:22:46+00:00",
+  "notes": "",
+  "recommendation_change": "No change",
+  "recommendation_history": [
+    "\u2605\u2605\u2605\u2606\u2606 WATCH",
+    "\u2605\u2605\u2605\u2606\u2606 WATCH"
+  ],
+  "source": "Other",
+  "times_seen": 2,
+  "title": "NicheForms.io",
+  "trend": "STABLE"
+}

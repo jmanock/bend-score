@@ -1,0 +1,28 @@
+{
+  "bend_score_change": 0.0,
+  "category": "Mobile App",
+  "current_bend_score": 54.1,
+  "current_founder_score": 60.3,
+  "current_recommendation": "\u2605\u2606\u2606\u2606\u2606 IGNORE",
+  "first_seen": "2026-07-04T17:23:36+00:00",
+  "founder_score_change": 0.0,
+  "historical_bend_scores": [
+    54.1,
+    54.1
+  ],
+  "historical_founder_scores": [
+    60.3,
+    60.3
+  ],
+  "last_seen": "2026-07-05T13:22:46+00:00",
+  "notes": "",
+  "recommendation_change": "No change",
+  "recommendation_history": [
+    "\u2605\u2606\u2606\u2606\u2606 IGNORE",
+    "\u2605\u2606\u2606\u2606\u2606 IGNORE"
+  ],
+  "source": "Sample",
+  "times_seen": 2,
+  "title": "Budget Trail Running App",
+  "trend": "STABLE"
+}

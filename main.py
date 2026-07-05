@@ -38,6 +38,14 @@ def main() -> None:
     note_parser.add_argument("listing_id", type=int)
     note_parser.add_argument("text")
 
+    feedback_parser = subparsers.add_parser("feedback", help="Store founder feedback on an opportunity.")
+    feedback_parser.add_argument("opportunity_id", type=int)
+    feedback_parser.add_argument("reaction")
+    feedback_parser.add_argument("note", nargs="?", default="")
+
+    opportunity_parser = subparsers.add_parser("opportunity", help="Show memory and feedback for one opportunity.")
+    opportunity_parser.add_argument("opportunity_id", type=int)
+
     args = parser.parse_args()
 
     if args.command == "run":
@@ -54,6 +62,10 @@ def main() -> None:
         app.watchlist()
     elif args.command == "note":
         app.note(args.listing_id, args.text)
+    elif args.command == "feedback":
+        app.feedback(args.opportunity_id, args.reaction, args.note)
+    elif args.command == "opportunity":
+        app.opportunity_detail(args.opportunity_id)
     elif args.command == "github":
         app.github()
     elif args.command == "signals":

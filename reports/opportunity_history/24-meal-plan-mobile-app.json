@@ -1,0 +1,28 @@
+{
+  "bend_score_change": 0.0,
+  "category": "Mobile App",
+  "current_bend_score": 58.0,
+  "current_founder_score": 66.2,
+  "current_recommendation": "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+  "first_seen": "2026-07-04T17:23:36+00:00",
+  "founder_score_change": 0.0,
+  "historical_bend_scores": [
+    58.0,
+    58.0
+  ],
+  "historical_founder_scores": [
+    66.2,
+    66.2
+  ],
+  "last_seen": "2026-07-05T13:22:46+00:00",
+  "notes": "",
+  "recommendation_change": "No change",
+  "recommendation_history": [
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH",
+    "\u2605\u2605\u2606\u2606\u2606 RESEARCH"
+  ],
+  "source": "Flippa",
+  "times_seen": 2,
+  "title": "Meal Plan Mobile App",
+  "trend": "STABLE"
+}

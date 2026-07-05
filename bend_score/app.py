@@ -12,9 +12,18 @@ from bend_score.database.repository import ListingRepository
 from bend_score.exporters.morning_content import SIGNAL_OUTBOX, export_opportunities
 from bend_score.intake.listings import ImportResult, listing_from_mapping, load_csv_rows
 from bend_score.logging_utils import configure_logging
+from bend_score.memory import (
+    build_roadmap,
+    detect_clusters,
+    movers_for,
+    next_action_for,
+    trend_for_memory,
+    write_opportunity_history_exports,
+)
 from bend_score.observers.github import GitHubObserver
 from bend_score.observers.registry import ObserverRegistry
 from bend_score.recommendations import apply_recommendation
+from bend_score.reports.blueprints import write_project_blueprints
 from bend_score.reports.markdown import write_intelligence_reports
 from bend_score import ui
 
@@ -41,16 +50,26 @@ def run() -> None:
         logger.info("timeline updated count=%s", len(inserted_signals))
 
         listings = refresh_scores(repository, logger)
+        memory_records = repository.record_opportunity_memory(listings)
+        feedback_entries = repository.list_feedback()
+        write_opportunity_history_exports(memory_records)
         ranked = sorted(listings, key=lambda item: item.bend_score or 0, reverse=True)
         print("Writing report...")
+        blueprint_paths = write_project_blueprints(ranked)
         latest_path, dated_path = write_intelligence_reports(
             intelligence,
             repository.list_signals(limit=500),
             ranked,
             repository.list_watchlist(),
+            memory_records=memory_records,
+            feedback_entries=feedback_entries,
+            clusters=detect_clusters(ranked),
+            roadmap=build_roadmap(ranked, memory_records, feedback_entries),
+            movers=movers_for(memory_records),
         )
         print("Done.")
         logger.info("reports generated latest=%s dated=%s", latest_path, dated_path)
+        logger.info("project blueprints generated count=%s", len(blueprint_paths))
 
         ui.header()
         ui.section("Observer Run")
@@ -80,6 +99,7 @@ def run() -> None:
 
         ui.section("Recent Activity")
         print(f"Reports generated: {latest_path} and {dated_path}")
+        print(f"Project blueprints generated: {len(blueprint_paths)}")
         for observation in portfolio_observations(ranked)[:3]:
             print(f"- {observation}")
         print(f"{ui.CYAN}================================={ui.RESET}")
@@ -93,8 +113,9 @@ def run() -> None:
 
 def refresh_scores(repository: ListingRepository, logger: logging.Logger | None = None) -> list:
     listings = repository.list_all()
+    feedback_entries = repository.list_feedback()
     for listing in listings:
-        apply_recommendation(listing)
+        apply_recommendation(listing, feedback_entries)
     repository.update_scores(listings)
     if logger:
         logger.info("scores calculated count=%s", len(listings))
@@ -138,6 +159,24 @@ def note(listing_id: int, text: str) -> None:
     item = repository.append_note(listing_id, text)
     title = item.listing.title if item.listing else f"Listing #{listing_id}"
     print(f"Added note to #{listing_id}: {title}")
+
+
+def feedback(listing_id: int, reaction: str, note_text: str = "") -> None:
+    allowed = {"love", "like", "ignore", "build", "buy", "pass", "research"}
+    if reaction.lower() not in allowed:
+        print(f"Invalid reaction: {reaction}. Allowed: {', '.join(sorted(allowed))}")
+        return
+    repository = _ready_repository()
+    entry = repository.add_feedback(listing_id, reaction.lower(), note_text)
+    refresh_scores(repository)
+    listing = repository.get_listing(listing_id)
+    ui.header("Founder Feedback")
+    print(f"Stored feedback for #{listing_id}: {entry.reaction}")
+    if note_text:
+        print(f"Note: {note_text}")
+    if listing:
+        print(f"Updated Founder Score: {(listing.founder_score or 0):.1f}/100")
+        print(f"Updated Recommendation: {listing.recommendation}")
 
 
 def github() -> None:
@@ -269,10 +308,56 @@ def listing_detail(listing_id: int) -> None:
     ui.print_listing_detail(listing, repository.watchlist_status(listing_id))
 
 
+def opportunity_detail(listing_id: int) -> None:
+    repository = _ready_repository()
+    listing = repository.get_listing(listing_id)
+    if not listing:
+        print(f"Opportunity #{listing_id} not found.")
+        return
+    memory = repository.get_opportunity_memory(listing_id)
+    feedback_entries = repository.list_feedback(listing_id)
+    trend = trend_for_memory(memory) if memory else None
+    ui.header(f"Opportunity #{listing_id}")
+    print(f"Title: {listing.title}")
+    print(f"Category: {listing.category}")
+    print(f"Source: {listing.source}")
+    print(f"Bend Score: {(listing.bend_score or 0):.1f}/100")
+    print(f"Founder Score: {(listing.founder_score or 0):.1f}/100")
+    print(f"Portfolio Fit: {(listing.portfolio_fit or 0):.1f}/100")
+    print(f"Trend: {trend.label if trend else 'NEW'}")
+    if trend:
+        print(f"Bend score change: {trend.bend_score_change:+.1f}")
+        print(f"Founder score change: {trend.founder_score_change:+.1f}")
+        print(f"Recommendation change: {trend.recommendation_change}")
+        print(f"Times seen: {trend.times_seen}")
+    print(f"Recommendation: {listing.recommendation}")
+    print(f"Executive summary: {listing.executive_summary or 'n/a'}")
+    print(f"Blueprint path: reports/project_blueprints/{_slug(listing.title)}.md")
+    print(f"Next action: {next_action_for(listing)}")
+    print()
+    print("Score history:")
+    if memory and memory.history:
+        for snapshot in memory.history[-8:]:
+            print(
+                f"- {snapshot.timestamp}: Bend {snapshot.bend_score:.1f}, "
+                f"Founder {snapshot.founder_score:.1f}, {snapshot.recommendation}"
+            )
+    else:
+        print("- No history recorded yet. Run python3 main.py run to create memory.")
+    print()
+    print("Feedback history:")
+    if feedback_entries:
+        for entry in feedback_entries:
+            suffix = f" - {entry.note}" if entry.note else ""
+            print(f"- {entry.created_at}: {entry.reaction}{suffix}")
+    else:
+        print("- No feedback yet.")
+
+
 def export_signals() -> None:
     repository = _ready_repository()
     listings = repository.list_all()
-    summary = export_opportunities(listings)
+    summary = export_opportunities(listings, memory_records=repository.list_opportunity_memory())
     ui.header("Morning Content Signal Export")
     for line in summary.lines():
         print(line)
@@ -296,3 +381,9 @@ def _ready_repository() -> ListingRepository:
         repository.add_many(sample_listings()[:SEED_COUNT])
     refresh_scores(repository)
     return repository
+
+
+def _slug(value: str) -> str:
+    import re
+
+    return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")[:80] or "opportunity"

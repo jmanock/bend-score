@@ -27,6 +27,15 @@ class Listing:
     created_at: str
     updated_at: str
     bend_score: float | None = None
+    founder_score: float | None = None
+    founder_reasons: str | None = None
+    portfolio_fit: float | None = None
+    build_complexity: str | None = None
+    build_complexity_explanation: str | None = None
+    maintenance_estimate: str | None = None
+    revenue_timeline: str | None = None
+    revenue_timeline_explanation: str | None = None
+    executive_summary: str | None = None
     recommendation: str | None = None
     recommendation_explanation: str | None = None
 
@@ -48,6 +57,15 @@ class Listing:
             created_at=row["created_at"],
             updated_at=row["updated_at"],
             bend_score=row["bend_score"],
+            founder_score=_row_value(row, "founder_score"),
+            founder_reasons=_row_value(row, "founder_reasons"),
+            portfolio_fit=_row_value(row, "portfolio_fit"),
+            build_complexity=_row_value(row, "build_complexity"),
+            build_complexity_explanation=_row_value(row, "build_complexity_explanation"),
+            maintenance_estimate=_row_value(row, "maintenance_estimate"),
+            revenue_timeline=_row_value(row, "revenue_timeline"),
+            revenue_timeline_explanation=_row_value(row, "revenue_timeline_explanation"),
+            executive_summary=_row_value(row, "executive_summary"),
             recommendation=row["recommendation"],
             recommendation_explanation=_row_value(row, "recommendation_explanation"),
         )
@@ -66,4 +84,3 @@ class WatchlistItem:
 
 def _row_value(row: Any, key: str) -> Any:
     return row[key] if key in row.keys() else None
-

@@ -7,6 +7,15 @@ from bend_score.ai.ideas import improvement_ideas, why_interesting
 from bend_score.analysis.insights import listing_insights, portfolio_observations
 from bend_score.core.intelligence import IntelligenceRun
 from bend_score.config import REPORT_DIR
+from bend_score.memory import (
+    FeedbackEntry,
+    Movers,
+    OpportunityCluster,
+    OpportunityMemory,
+    RoadmapItem,
+    movers_for,
+    trend_for_memory,
+)
 from bend_score.models import Listing, Signal, WatchlistItem
 from bend_score.scoring.bend_score import calculate_bend_score
 
@@ -19,12 +28,27 @@ def write_intelligence_reports(
     all_signals: list[Signal],
     listings: list[Listing],
     watchlist: list[WatchlistItem],
+    memory_records: list[OpportunityMemory] | None = None,
+    feedback_entries: list[FeedbackEntry] | None = None,
+    clusters: list[OpportunityCluster] | None = None,
+    roadmap: list[RoadmapItem] | None = None,
+    movers: Movers | None = None,
     report_dir: Path = REPORT_DIR,
 ) -> tuple[Path, Path]:
     report_dir.mkdir(parents=True, exist_ok=True)
     latest_path = report_dir / "latest.md"
     dated_path = report_dir / f"{datetime.now().strftime('%Y-%m-%d')}.md"
-    content = build_intelligence_report(intelligence, all_signals, listings, watchlist)
+    content = build_intelligence_report(
+        intelligence,
+        all_signals,
+        listings,
+        watchlist,
+        memory_records=memory_records,
+        feedback_entries=feedback_entries,
+        clusters=clusters,
+        roadmap=roadmap,
+        movers=movers,
+    )
     latest_path.write_text(content, encoding="utf-8")
     dated_path.write_text(content, encoding="utf-8")
     return latest_path, dated_path
@@ -35,75 +59,146 @@ def build_intelligence_report(
     all_signals: list[Signal],
     listings: list[Listing],
     watchlist: list[WatchlistItem],
+    memory_records: list[OpportunityMemory] | None = None,
+    feedback_entries: list[FeedbackEntry] | None = None,
+    clusters: list[OpportunityCluster] | None = None,
+    roadmap: list[RoadmapItem] | None = None,
+    movers: Movers | None = None,
 ) -> str:
     current_signals = intelligence.signals
-    high_confidence = sorted(
-        [signal for signal in current_signals if signal.confidence >= 80],
-        key=lambda signal: signal.confidence,
+    memory_records = memory_records or []
+    feedback_entries = feedback_entries or []
+    clusters = clusters or []
+    roadmap = roadmap or []
+    movers = movers or movers_for(memory_records)
+    ranked = sorted(
+        listings,
+        key=lambda listing: ((listing.founder_score or 0), (listing.portfolio_fit or 0), (listing.bend_score or 0)),
         reverse=True,
     )
     lines = [
-        "# Today's Intelligence",
+        "# Bend Score Morning Investment Memo",
         "",
         f"Date generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}",
-        f"Signals generated today: {len(current_signals)}",
-        f"Signals in timeline: {len(all_signals)}",
         "",
-        "## High Confidence Signals",
+        "## Executive Summary",
         "",
     ]
-    lines.extend(_signal_lines(high_confidence[:12]))
-
-    for recommendation in ["BUY", "WATCH", "BUILD", "RESEARCH", "IGNORE"]:
-        matching = [signal for signal in current_signals if signal.recommendation == recommendation]
-        lines.extend([f"## {recommendation}", ""])
-        lines.extend(_signal_lines(matching[:10]))
-
-    github_signals = [signal for signal in current_signals if signal.observer == "github"]
-    if github_signals:
-        lines.extend(_github_section(github_signals))
-
-    lines.extend(["## Signal Summary", ""])
-    lines.append(f"- Generated this run: {len(current_signals)}")
-    lines.append(f"- Average confidence: {intelligence.average_confidence:.1f}%")
-    lines.append(f"- Highest confidence: {intelligence.highest_confidence}%")
-    lines.append(f"- Timeline snapshots stored: {len(all_signals)}")
-    lines.append("")
-
-    lines.extend(["## Statistics", ""])
-    lines.append(f"- Listings in database: {len(listings)}")
-    lines.append(f"- Watchlist items: {len(watchlist)}")
-    if listings:
-        average_score = sum(listing.bend_score or 0 for listing in listings) / len(listings)
-        lines.append(f"- Average Bend Score: {average_score:.1f}")
-    lines.append("")
-
-    lines.extend(_marketplace_listing_section(listings))
-
-    lines.extend(["## Observer Summary", ""])
-    if not intelligence.observer_results:
-        lines.append("- No observers enabled.")
-    for result in intelligence.observer_results:
-        average = (
-            sum(signal.confidence for signal in result.signals) / len(result.signals)
-            if result.signals
-            else 0
+    if ranked:
+        top = ranked[0]
+        lines.append(
+            f"- Top decision: **{top.title}** with Founder {(top.founder_score or 0):.0f}/100, "
+            f"Portfolio Fit {(top.portfolio_fit or 0):.0f}/100, recommendation **{top.recommendation}**."
         )
-        highest = max([signal.confidence for signal in result.signals], default=0)
-        lines.append(f"- {result.label}:")
-        lines.append(f"  - Signals generated: {len(result.signals)}")
-        lines.append(f"  - Raw facts collected: {result.raw_count}")
-        lines.append(f"  - Average confidence: {average:.1f}%")
-        lines.append(f"  - Highest confidence: {highest}%")
-        lines.append(f"  - Runtime: {result.runtime_seconds:.3f}s")
+    lines.append(f"- Opportunities tracked in memory: {len(memory_records)}")
+    lines.append(f"- Signals generated this run: {len(current_signals)}; timeline signals retained: {len(all_signals)}")
+    lines.append(f"- Founder feedback notes stored: {len(feedback_entries)}")
     lines.append("")
 
-    lines.extend(["## Recommendations", ""])
-    recommendations = _recommendation_summary(current_signals)
-    lines.extend([f"- {line}" for line in recommendations])
-    lines.append("")
+    lines.extend(_top_three_section(ranked[:3], memory_records))
+    lines.extend(_movers_section(movers))
+    lines.extend(_clusters_section(clusters))
+    lines.extend(_roadmap_section(roadmap))
+    lines.extend(_feedback_section(feedback_entries))
+    lines.extend(_full_table_section(ranked, memory_records))
 
     return "\n".join(lines)
+
+
+def _top_three_section(listings: list[Listing], memory_records: list[OpportunityMemory]) -> list[str]:
+    lines = ["## Today's Top 3 Opportunities", ""]
+    memory_by_id = {memory.listing_id: memory for memory in memory_records}
+    if not listings:
+        return lines + ["No listings available.", ""]
+    for index, listing in enumerate(listings, start=1):
+        trend = trend_for_memory(memory_by_id[listing.id]) if listing.id in memory_by_id else None
+        lines.append(f"### {index}. {listing.title}")
+        lines.append(f"- Recommendation: {listing.recommendation or 'n/a'}")
+        lines.append(f"- Founder Score: {(listing.founder_score or 0):.0f}/100")
+        lines.append(f"- Portfolio Fit: {(listing.portfolio_fit or 0):.0f}/100")
+        lines.append(f"- Trend: {trend.label if trend else 'NEW'}")
+        lines.append(f"- Next action: {listing.executive_summary or 'Review opportunity detail.'}")
+        lines.append("")
+    return lines
+
+
+def _movers_section(movers: Movers) -> list[str]:
+    lines = ["## Today's Movers", ""]
+
+    def label(memory: OpportunityMemory | None) -> str:
+        if memory is None:
+            return "n/a"
+        trend = trend_for_memory(memory)
+        return (
+            f"#{memory.listing_id} {memory.title} ({trend.label}, "
+            f"Founder {trend.founder_score_change:+.1f}, Bend {trend.bend_score_change:+.1f}, "
+            f"seen {trend.times_seen}x)"
+        )
+
+    lines.append(f"- Biggest rising opportunity: {label(movers.biggest_rising)}")
+    lines.append(f"- Biggest falling opportunity: {label(movers.biggest_falling)}")
+    lines.append(
+        "- Newly discovered high-potential opportunities: "
+        + (", ".join(f"#{memory.listing_id} {memory.title}" for memory in movers.newly_discovered) or "n/a")
+    )
+    lines.append(f"- Most consistent opportunity: {label(movers.most_consistent)}")
+    lines.append(f"- Most volatile opportunity: {label(movers.most_volatile)}")
+    lines.append("")
+    return lines
+
+
+def _clusters_section(clusters: list[OpportunityCluster]) -> list[str]:
+    lines = ["## Opportunity Clusters", ""]
+    if not clusters:
+        return lines + ["No strong clusters yet.", ""]
+    for cluster in clusters[:5]:
+        lines.append(f"### {cluster.name}")
+        lines.append(cluster.reason)
+        for listing in cluster.listings:
+            lines.append(f"- #{listing.id} {listing.title} ({listing.category})")
+        lines.append("")
+    return lines
+
+
+def _roadmap_section(roadmap: list[RoadmapItem]) -> list[str]:
+    lines = ["## Suggested Build Roadmap", ""]
+    if not roadmap:
+        return lines + ["No roadmap items available.", ""]
+    for index, item in enumerate(roadmap[:5], start=1):
+        lines.append(f"{index}. **{item.listing.title}** - {item.action}")
+        lines.append(f"   - Roadmap score: {item.score:.1f}")
+        lines.append(f"   - Next action: {item.next_action}")
+        lines.append(f"   - Estimated MVP timeline: {item.estimated_mvp_timeline}")
+    lines.append("")
+    return lines
+
+
+def _feedback_section(feedback_entries: list[FeedbackEntry]) -> list[str]:
+    lines = ["## Feedback Notes", ""]
+    if not feedback_entries:
+        return lines + ["No founder feedback recorded yet.", ""]
+    for entry in feedback_entries[:8]:
+        note = f" - {entry.note}" if entry.note else ""
+        lines.append(f"- #{entry.listing_id} {entry.title}: {entry.reaction}{note}")
+    lines.append("")
+    return lines
+
+
+def _full_table_section(listings: list[Listing], memory_records: list[OpportunityMemory]) -> list[str]:
+    lines = ["## Full Opportunity Table", ""]
+    memory_by_id = {memory.listing_id: memory for memory in memory_records}
+    lines.append("| ID | Opportunity | Founder | Bend | Trend | Seen | Recommendation |")
+    lines.append("| --- | --- | ---: | ---: | --- | ---: | --- |")
+    for listing in listings:
+        memory = memory_by_id.get(listing.id)
+        trend = trend_for_memory(memory) if memory else None
+        lines.append(
+            f"| {listing.id} | {listing.title} | {(listing.founder_score or 0):.0f} | "
+            f"{(listing.bend_score or 0):.0f} | {trend.label if trend else 'NEW'} | "
+            f"{trend.times_seen if trend else 0} | {listing.recommendation or 'n/a'} |"
+        )
+    lines.append("")
+    return lines
 
 
 def _signal_lines(signals: list[Signal]) -> list[str]:
@@ -134,16 +229,16 @@ def _recommendation_summary(signals: list[Signal]) -> list[str]:
 
 
 def _marketplace_listing_section(listings: list[Listing]) -> list[str]:
-    lines = ["## Marketplace Listings", ""]
+    lines = ["## Marketplace Opportunity Memos", ""]
     if not listings:
         return lines + ["No listings available.", ""]
-    ranked = sorted(listings, key=lambda listing: listing.bend_score or 0, reverse=True)
+    ranked = sorted(
+        listings,
+        key=lambda listing: ((listing.founder_score or 0), (listing.portfolio_fit or 0), (listing.bend_score or 0)),
+        reverse=True,
+    )
     for listing in ranked[:10]:
-        lines.append(
-            f"- #{listing.id} **{listing.title}** - {listing.source}, {listing.category}, "
-            f"{listing.bend_score:.1f}/100, asking {_money(listing.asking_price)}, "
-            f"revenue {_money(listing.monthly_revenue)}/mo, profit {_money(listing.monthly_profit)}/mo"
-        )
+        lines.extend(_memo_block(listing))
     lines.append("")
     return lines
 
@@ -243,7 +338,13 @@ def _listing_block(index: int, listing: Listing) -> list[str]:
         f"### {index}. {listing.title}",
         "",
         f"- Bend Score: {listing.bend_score:.0f}/100",
+        f"- Founder Score: {(listing.founder_score or 0):.0f}/100",
+        f"- Portfolio Fit: {(listing.portfolio_fit or 0):.0f}/100",
+        f"- Build Complexity: {listing.build_complexity or 'n/a'}",
+        f"- Maintenance: {listing.maintenance_estimate or 'n/a'}",
+        f"- Revenue Timeline: {listing.revenue_timeline or 'n/a'} - {listing.revenue_timeline_explanation or 'n/a'}",
         f"- Recommendation: {listing.recommendation} - {listing.recommendation_explanation}",
+        f"- Executive Summary: {listing.executive_summary or 'n/a'}",
         f"- Category: {listing.category}",
         f"- Asking price: {_money(listing.asking_price)}",
         f"- Monthly revenue: {_money(listing.monthly_revenue)}",
@@ -254,6 +355,48 @@ def _listing_block(index: int, listing: Listing) -> list[str]:
     ]
 
 
+def _memo_block(listing: Listing) -> list[str]:
+    lines = [
+        f"### #{listing.id} {listing.title}",
+        "",
+        f"- Recommendation: {listing.recommendation or 'n/a'}",
+        f"- Bend Score: {(listing.bend_score or 0):.0f}/100",
+        f"- Founder Score: {(listing.founder_score or 0):.0f}/100",
+        f"- Portfolio Fit: {(listing.portfolio_fit or 0):.0f}/100",
+        f"- Build Complexity: {listing.build_complexity or 'n/a'}",
+        f"- Maintenance: {listing.maintenance_estimate or 'n/a'}",
+        f"- Revenue begins: {listing.revenue_timeline or 'n/a'}",
+        f"- Asking price: {_money(listing.asking_price)}",
+        f"- Monthly revenue/profit: {_money(listing.monthly_revenue)} / {_money(listing.monthly_profit)}",
+        f"- URL: {listing.url}",
+        "",
+        "Executive Summary:",
+        "",
+        listing.executive_summary or "No executive summary available.",
+        "",
+        "Why It Scored Well:",
+        "",
+    ]
+    reasons = [reason.strip() for reason in (listing.founder_reasons or "").splitlines() if reason.strip()]
+    if not reasons:
+        reasons = ["Founder intelligence has not been calculated yet."]
+    lines.extend([f"- {reason}" for reason in reasons])
+    lines.extend(
+        [
+            "",
+            "Complexity Notes:",
+            "",
+            listing.build_complexity_explanation or "No complexity explanation available.",
+            "",
+            "Timeline Assumption:",
+            "",
+            listing.revenue_timeline_explanation or "No revenue timeline explanation available.",
+            "",
+        ]
+    )
+    return lines
+
+
 def _compact_section(title: str, listings: list[Listing]) -> list[str]:
     lines = [f"## {title}", ""]
     if not listings:
@@ -261,7 +404,7 @@ def _compact_section(title: str, listings: list[Listing]) -> list[str]:
         return lines
     for listing in listings:
         lines.append(
-            f"- {listing.title}: {listing.bend_score:.0f}/100, "
+            f"- {listing.title}: Bend {(listing.bend_score or 0):.0f}/100, Founder {(listing.founder_score or 0):.0f}/100, "
             f"{listing.category}, {_money(listing.asking_price)} asking, "
             f"{_money(listing.monthly_revenue)}/mo revenue"
         )

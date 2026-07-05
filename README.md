@@ -1,8 +1,8 @@
 # Bend Score
 
-Bend Score is a terminal-first internet intelligence platform for finding and evaluating digital acquisition opportunities.
+Bend Score is a terminal-first opportunity intelligence platform for finding, evaluating, and planning digital acquisition or build opportunities.
 
-V5 adds Morning Content Engine signal export on top of the observer, marketplace intake, scoring, reports, recommendations, and watchlist workflow. You can paste or import real listings, score them, and export the best opportunities as standardized signal JSON files.
+V6.5 adds Opportunity Memory on top of Founder Intelligence, the observer framework, marketplace intake, Bend Score scoring, reports, recommendations, watchlist workflow, SQLite timeline, and Morning Content Engine signal export. It now tracks whether opportunities are rising, falling, stable, volatile, or new, and lets Jon store feedback that lightly influences future Founder Scores.
 
 Bend Score uses GitHub's public REST API for the GitHub Observer. It does not use paid APIs, OpenAI calls, marketplace scraping, cloud services, authentication, or a web dashboard.
 
@@ -33,6 +33,7 @@ Reports are generated at:
 
 - `reports/latest.md`
 - `reports/YYYY-MM-DD.md`
+- `reports/project_blueprints/*.md`
 
 Daily logs are stored in:
 
@@ -55,6 +56,8 @@ python3 main.py import-csv examples/sample_listings.csv
 python3 main.py add-listing
 python3 main.py listings
 python3 main.py listing 21
+python3 main.py opportunity 21
+python3 main.py feedback 21 love "Good fit for automation and SEO"
 python3 main.py export-signals
 python3 main.py signals-outbox
 ```
@@ -62,7 +65,7 @@ python3 main.py signals-outbox
 ## Architecture
 
 ```text
-Observer -> Raw Facts -> Signal -> SQLite Timeline -> Intelligence Report
+Observer -> Raw Facts -> Signal -> SQLite Timeline -> Founder Intelligence -> Opportunity Memory -> Morning Investment Memo
 ```
 
 ```text
@@ -71,12 +74,12 @@ bend_score/
   observers/             Observer base class, registry, fake observer, GitHub observer
   models/                Listing, watchlist, and standardized Signal models
   database/              SQLite repository, listings, watchlist, signals, signal history
-  reports/               Markdown intelligence briefings
+  reports/               Markdown intelligence briefings and project blueprints
   intake/                CSV/manual listing validation and normalization
   utils/                 Confidence and config helpers
-  scoring/               Existing Bend Score acquisition scoring
+  scoring/               Bend Score and Founder Score engines
   analysis/              Rule-based business insights
-  ai/                    Placeholder only; no AI calls in V5
+  ai/                    Placeholder only; no paid API or AI calls
 examples/
   sample_listings.csv    Example marketplace listing import file
 config/
@@ -87,6 +90,8 @@ logs/
   YYYY-MM-DD.log         Run logs
 reports/
   latest.md              Current daily briefing
+  project_blueprints/    Build/acquisition blueprints for top opportunities
+  opportunity_history/   Optional JSON exports of score and recommendation memory
 tests/
   unit tests
 signals/
@@ -96,7 +101,7 @@ signals/
 
 ## Morning Content Engine Signal Export
 
-V5 can export high-value Bend Score opportunities as standardized signal JSON files for Morning Content Engine.
+V6.5 can export high-value Bend Score opportunities as standardized signal JSON files for Morning Content Engine.
 
 Run:
 
@@ -128,7 +133,7 @@ The exporter uses the Morning Content Engine Signal Contract:
 Export selection rules:
 
 - Bend Score is `70` or higher
-- or recommendation is `BUY`, `BUILD`, `WATCH`, or `RESEARCH`
+- or recommendation contains `BUILD NOW`, `ACQUIRE`, `BUILD LATER`, `WATCH`, or `RESEARCH`
 - or confidence is `80` or higher
 
 `IGNORE` and `PASS` items are not exported.
@@ -137,7 +142,13 @@ Each signal metadata object includes:
 
 - original listing id
 - Bend Score
+- Founder Score
+- Portfolio Fit
 - recommendation
+- build complexity
+- maintenance estimate
+- revenue timeline
+- executive summary
 - asking price
 - monthly revenue
 - monthly profit
@@ -221,7 +232,7 @@ Every run inserts new rows into `signals` and `signal_history`. History is never
 
 ## Manual Intake
 
-V5 supports two no-scraping intake paths:
+Bend Score supports two no-scraping intake paths:
 
 ```bash
 python3 main.py import-csv examples/sample_listings.csv
@@ -406,16 +417,115 @@ A small observer should be possible in under 100 lines because it only needs to 
 `reports/latest.md` is now a daily intelligence briefing with:
 
 - High Confidence Signals
-- BUY
-- WATCH
-- BUILD
-- RESEARCH
-- IGNORE
+- observer recommendation groups
 - Signal Summary
 - Statistics
+- Marketplace Opportunity Memos
+- Founder Score
+- Portfolio Fit
+- Build Complexity
+- Maintenance
+- Revenue Timeline
+- Executive Summary
 - Observer Summary
 - Recommendations
 - GitHub Intelligence, when GitHub is enabled
+
+## Founder Intelligence
+
+Founder Intelligence is separate from Bend Score. Bend Score evaluates the asset as a business listing. Founder Score evaluates whether the opportunity fits Jon's build, automation, content, affiliate, SEO, and portfolio strategy.
+
+Founder Score considers:
+
+- automation potential
+- API availability
+- SEO scalability
+- affiliate potential
+- evergreen demand
+- content generation potential
+- ability to create hundreds or thousands of pages
+- monthly maintenance effort
+- competition level
+- recurring revenue potential
+- SaaS or mobile app expansion
+- cross-promotion with Florida Deals, Offer Radar, Morning Content, and Morning OS-style workflows
+- ease of MVP
+- long-term defensibility
+
+Recommendations use the V6 action labels:
+
+- `★★★★★ BUILD NOW`
+- `★★★★☆ ACQUIRE`
+- `★★★★☆ BUILD LATER`
+- `★★★☆☆ WATCH`
+- `★★☆☆☆ RESEARCH`
+- `★☆☆☆☆ IGNORE`
+
+Every top opportunity in `reports/latest.md` includes the Founder Score, Portfolio Fit, build complexity, maintenance estimate, revenue timeline, and an executive summary. The same run also writes project blueprints into `reports/project_blueprints/` with target audience, revenue model, tech stack, APIs, database, automation opportunities, SEO strategy, affiliate networks, content ideas, mobile ideas, roadmap, MVP timeline, and monthly maintenance.
+
+## Opportunity Memory
+
+Every `python3 main.py run` stores an opportunity snapshot in SQLite and exports optional JSON history files into `reports/opportunity_history/`.
+
+Tracked memory includes:
+
+- first seen and last seen
+- title, category, and source
+- current Bend Score and Founder Score
+- current recommendation
+- historical Bend Scores
+- historical Founder Scores
+- recommendation history
+- times seen
+- notes
+
+Trend labels are calculated from recent score history:
+
+- `NEW`
+- `RISING`
+- `FALLING`
+- `STABLE`
+- `VOLATILE`
+
+Use the detail command to inspect one opportunity:
+
+```bash
+python3 main.py opportunity 21
+```
+
+The detail view shows current scores, trend, recommendation, score history, feedback history, blueprint path, and next action.
+
+## Founder Feedback
+
+Store lightweight founder feedback with:
+
+```bash
+python3 main.py feedback 21 love "Good fit for automation and SEO"
+```
+
+Allowed reactions:
+
+- `love`
+- `like`
+- `ignore`
+- `build`
+- `buy`
+- `pass`
+- `research`
+
+Feedback is stored in SQLite. Loved or build/buy categories get a small future boost. Ignored or passed categories get a small penalty, especially when similar opportunities have higher maintenance. Adjustments are intentionally small and are included in recommendation explanations when they apply.
+
+## Morning Memo Sections
+
+`reports/latest.md` is intentionally concise and includes:
+
+- Executive Summary
+- Today's Top 3 Opportunities
+- Today's Movers
+- Opportunity Clusters
+- Suggested Build Roadmap
+- Feedback Notes
+- Full Opportunity Table
 
 The GitHub section includes:
 

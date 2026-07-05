@@ -9,8 +9,21 @@ class RecommendationTest(unittest.TestCase):
         listing = apply_recommendation(sample_listings()[0])
 
         self.assertIsNotNone(listing.bend_score)
-        self.assertIn(listing.recommendation, {"BUY", "WATCH", "RESEARCH", "IGNORE"})
+        self.assertIsNotNone(listing.founder_score)
+        self.assertIsNotNone(listing.portfolio_fit)
+        self.assertIn(
+            listing.recommendation,
+            {
+                "★★★★★ BUILD NOW",
+                "★★★★☆ ACQUIRE",
+                "★★★★☆ BUILD LATER",
+                "★★★☆☆ WATCH",
+                "★★☆☆☆ RESEARCH",
+                "★☆☆☆☆ IGNORE",
+            },
+        )
         self.assertTrue(listing.recommendation_explanation)
+        self.assertTrue(listing.executive_summary)
 
 
 if __name__ == "__main__":
